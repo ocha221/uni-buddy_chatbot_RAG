@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Information System</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>University Information System</h1>
+    </header>
+    
+    <nav>
+        <ul class="tabs">
+            <li class="tab active" data-tab="course-search">Course Search</li>
+            <li class="tab" data-tab="filter-courses">Filter by Year/Semester</li>
+            <li class="tab" data-tab="professor-courses">Professor Lookup</li>
+            <li class="tab" data-tab="smart-professor">Smart Professor Search</li>
+            <li class="tab" data-tab="name-variation">Add Name Variation</li>
+        </ul>
+    </nav>
+    
+    <main>
+        <!-- Course Search Section -->
+        <section id="course-search" class="tab-content active">
+            <h2>Search Courses by Content</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="search-query">Search Query:</label>
+                    <input type="text" id="search-query" placeholder="Enter search terms...">
+                </div>
+                <div class="form-group">
+                    <label for="search-limit">Results Limit:</label>
+                    <input type="number" id="search-limit" min="1" max="20" value="5">
+                </div>
+                <button id="search-button">Search</button>
+            </div>
+            <div id="search-results" class="results-container"></div>
+        </section>
+        
+        <!-- Filter Courses Section -->
+        <section id="filter-courses" class="tab-content">
+            <h2>Filter Courses by Year and Semester</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="filter-year">Year:</label>
+                    <input type="number" id="filter-year" placeholder="Enter year...">
+                </div>
+                <div class="form-group">
+                    <label for="filter-semester">Semester:</label>
+                    <input type="number" id="filter-semester" min="1" max="8" placeholder="Enter semester...">
+                </div>
+                <div class="form-group">
+                    <label for="filter-limit">Results Limit:</label>
+                    <input type="number" id="filter-limit" min="1" max="50" value="10">
+                </div>
+                <button id="filter-button">Filter</button>
+            </div>
+            <div id="filter-results" class="results-container"></div>
+        </section>
+        
+        <!-- Professor Courses Section -->
+        <section id="professor-courses" class="tab-content">
+            <h2>Find Courses by Professor</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="professor-name">Professor Name:</label>
+                    <input type="text" id="professor-name" placeholder="Enter professor name...">
+                </div>
+                <button id="professor-button">Find Courses</button>
+            </div>
+            <div id="professor-results" class="results-container"></div>
+        </section>
+        
+        <!-- Smart Professor Search Section -->
+        <section id="smart-professor" class="tab-content">
+            <h2>Smart Professor Search</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="smart-query">Natural Language Query:</label>
+                    <input type="text" id="smart-query" placeholder="E.g., 'What courses does Professor Smith teach?'">
+                </div>
+                <button id="smart-button">Find Professor</button>
+            </div>
+            <div id="extraction-result" class="results-container"></div>
+            <div id="smart-professor-results" class="results-container"></div>
+        </section>
+        
+        <!-- Add Name Variation Section -->
+        <section id="name-variation" class="tab-content">
+            <h2>Add Professor Name Variation</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="canonical-name">Canonical Professor Name:</label>
+                    <select id="canonical-name">
+                        <option value="">Loading professors...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="name-variation-input">Name Variation:</label>
+                    <input type="text" id="name-variation-input" placeholder="Enter name variation...">
+                </div>
+                <button id="variation-button">Add Variation</button>
+            </div>
+            <div id="variation-result" class="results-container"></div>
+        </section>
+    </main>
+    
+    <footer>
+        <p>University Information System &copy; 2025</p>
+    </footer>
+    
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

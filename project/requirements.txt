@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+chromadb
+langchain
+langchain-groq
+numpy
+python-dotenv
+click
+beautifulsoup4

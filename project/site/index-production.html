@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Information System</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="/static/css/styles-production.css">
+</head>
+<body>
+    <header>
+        <h1>University Information System</h1>
+    </header>
+    
+    <nav>
+        <ul class="tabs">
+            <li class="tab active" data-tab="natural-search">Ask Anything</li>
+            <li class="tab" data-tab="courses">Courses</li>
+            <li class="tab" data-tab="professors">Professors</li>
+            <li class="tab" data-tab="academic-years">Academic Years</li>
+        </ul>
+    </nav>
+    
+    <main>
+        <!-- Natural Language Search Section -->
+        <section id="natural-search" class="tab-content active">
+            <h2>Ask About Anything</h2>
+            
+            <div class="chat-input">
+                <input type="text" id="natural-query" placeholder="Ask about courses, professors, or anything else...">
+                <button id="ask-button">Ask</button>
+            </div>
+            
+            <div id="natural-results" class="results-container">
+                <div class="info">
+                    Try asking questions like:
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>"What courses does Professor Johnson teach?"</li>
+                        <li>"Show me third-year courses in the second semester"</li>
+                        <li>"Which courses are about machine learning?"</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Courses Section -->
+        <section id="courses" class="tab-content">
+            <h2>Course Information</h2>
+            
+            <div class="input-card">
+                <div class="search-wrapper">
+                    <input type="text" id="course-query" placeholder="Search for courses by topic, content, or code...">
+                    <button id="course-search-button">Search</button>
+                </div>
+            </div>
+            
+            <div id="course-results" class="results-container">
+                <div class="info">Enter keywords to search for courses</div>
+            </div>
+        </section>
+        
+        <!-- Professors Section -->
+        <section id="professors" class="tab-content">
+            <h2>Professor Information</h2>
+            
+            <div class="input-card">
+                <div class="search-wrapper">
+                    <input type="text" id="professor-name" placeholder="Enter professor name...">
+                    <button id="professor-button">Find Courses</button>
+                </div>
+            </div>
+            
+            <div id="professor-results" class="results-container">
+                <div class="info">Enter a professor's name to see their courses</div>
+            </div>
+        </section>
+        
+        <!-- Academic Years Section -->
+        <section id="academic-years" class="tab-content">
+            <h2>Browse by Academic Year</h2>
+            
+            <div class="input-card">
+                <div class="form-group">
+                    <label for="filter-year">Academic Year:</label>
+                    <select id="filter-year">
+                        <option value="">Select Year</option>
+                        <option value="1">Year 1</option>
+                        <option value="2">Year 2</option>
+                        <option value="3">Year 3</option>
+                        <option value="4">Year 4</option>
+                        <option value="5">Year 5</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="filter-semester">Semester:</label>
+                    <select id="filter-semester">
+                        <option value="">All Semesters</option>
+                        <option value="1">Semester 1</option>
+                        <option value="2">Semester 2</option>
+                    </select>
+                </div>
+                
+                <button id="filter-button">View Courses</button>
+            </div>
+            
+            <div id="filter-results" class="results-container">
+                <div class="info">Select an academic year and/or semester to view courses</div>
+            </div>
+        </section>
+        
+        <!-- Add Name Variation Section -->
+    </main>
+    
+    <footer>
+        <p>University Information System © 2025 | Designed for Intuitive Learning</p>
+    </footer>
+    
+    <script src="/static/js/script-production.js"></script>
+</body>
+</html>
