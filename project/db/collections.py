@@ -30,7 +30,15 @@ class Collections:
             metadata={"hnsw:space": "cosine"},
             embedding_function=self.jina_embeddings,
         )
-        
+    
+    def get_news_collection(self):
+        """Get or create the news collection"""
+        return self.client.get_or_create_collection(
+            name="news",
+            metadata={"hnsw:space": "cosine"},
+            embedding_function=self.jina_embeddings,
+        )
+
     def reset_collections(self, reset_courses=True, reset_professors=True, reset_name_mappings=True):
         """Reset specified collections"""
         if reset_courses:
