@@ -422,6 +422,15 @@ async def extract_professor_name(request: QueryRequest):
 @app.post("/search/unified")
 async def unified_search(request: QueryRequest):
     """Unified search endpoint that handles different query types"""
+
+    #? - "professor_courses": Questions about what courses a professor teaches
+    #? - "course_search": Searching for specific course content or topics
+    #? - "course_filtering": Filtering courses by year, semester, etc.
+    #? - "news_internship": Questions about internship announcements
+    #? - "news_ptixiaki": Questions about thesis announcements
+    #? - "news_general": General news inquiries
+    #? - "unknown": Unrecognized or irrelevant queries
+
     query = request.query.strip()
     query_intent = nlp_service.analyze_query_intent(query)
     if query_intent == "professor_courses":
@@ -443,7 +452,18 @@ async def unified_search(request: QueryRequest):
                     }
             except Exception:
                 pass
-    results = course_service.search_courses(query, 10) #? esto
+    
+    elif query_intent == "news_internship": #? filter to metadata gia "internship" 
+        pass
+    elif query_intent == "news_ptixiaki": #? filter to metadata gia "ptixiaki" alla dn yparxei akoma TODO
+        pass
+    elif query_intent == "news_general": #? genika sem search sto news  TODO
+        pass
+    elif query_intent == "unknown": #? TODO edw isos thelei h geniko search sta db h na rwtisei gia parapanw plhoroforia 
+        return {"query_type": "unknown", "data": None, "message": "Query not recognized"} 
+        #? episis TODO chat history me to llm gia na exei synafeia
+    
+    results = course_service.search_courses(query, 10) #? esto an den vrike kati, prepei na valw allo default TODO
     if not results or not results["ids"][0]:
         return {"query_type": "unknown", "data": None, "message": "No results found"}
         

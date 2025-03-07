@@ -115,6 +115,10 @@ Output: "Papadopoulos"
     - "course_search": Searching for specific course content or topics
     - "course_filtering": Filtering courses by year, semester, etc.
     - "general_info": General questions about the university
+    - "news_internship": Questions about internship announcements
+    - "news_ptixiaki": Questions about thesis announcements
+    - "news_general": General news inquiries
+    - "unknown": Unrecognized or irrelevant queries
 
     Return ONLY the category name, nothing else.
     """
