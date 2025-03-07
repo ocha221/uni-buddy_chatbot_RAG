@@ -8,3 +8,4 @@ numpy
 python-dotenv
 click
 beautifulsoup4
+schedule

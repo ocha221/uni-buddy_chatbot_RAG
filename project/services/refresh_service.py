@@ -14,12 +14,12 @@ class RefreshService:
         self.professor_service = professor_service
         self.name_service = name_service
     
-    def find_latest_data_directory(self, base_path, pattern=r'(\d{4}-\d{2}-\d{2})_scraped_on'):
+    def find_latest_data_directory(self, base_path, pattern=r'(\d{2}_\d{2}_\d{4})_scraped_on'):
         """Find the most recent data directory based on date in folder name"""
         if not os.path.exists(base_path):
+            
             logger.warning(f"Base path does not exist: {base_path}")
             return None
-        
         latest_dir = None
         latest_date = None
         
@@ -30,7 +30,7 @@ class RefreshService:
                 if match:
                     date_str = match.group(1)
                     try:
-                        date = datetime.strptime(date_str, '%Y-%m-%d')
+                        date = datetime.strptime(date_str, '%d_%m_%Y')
                         if latest_date is None or date > latest_date:
                             latest_date = date
                             latest_dir = item_path
@@ -45,7 +45,7 @@ class RefreshService:
         return latest_dir
     
     def refresh_courses(self, base_path="course_data", skip_professors=False, reset=True):
-        """Refresh courses collection with latest scraped data"""
+        """Refresh courses collection with latest data"""
         latest_dir = self.find_latest_data_directory(base_path)
         if not latest_dir:
             logger.error(f"No course data directory found in {base_path}")
@@ -67,7 +67,7 @@ class RefreshService:
         return self.course_service.batch_import_courses(latest_dir, skip_professors)
     
     def refresh_news(self, base_path="news_data", reset=True):
-        """Refresh news collection with latest scraped data"""
+        """Refresh news collection with latest data"""
         latest_dir = self.find_latest_data_directory(base_path)
         if not latest_dir:
             logger.error(f"No news data directory found in {base_path}")
@@ -102,7 +102,7 @@ class RefreshService:
     
     def refresh_all(self, course_path="course_data", news_path="news_data", reset=True):
         """Refresh all collections with latest data"""
-        course_count = self.refresh_courses(course_path, skip_professors=False, reset=reset)
+        course_count = self.refresh_courses(course_path, skip_professors=True, reset=reset)
         news_count = self.refresh_news(news_path, reset=reset)
         prof_count = self.refresh_professors(consolidate=True)
         

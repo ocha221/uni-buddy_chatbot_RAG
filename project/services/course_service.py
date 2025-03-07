@@ -109,7 +109,7 @@ class CourseService:
         course_files = []
         for root, _, files in os.walk(directory):
             for file in files:
-                if file.endswith(".course.json"):
+                if file.endswith(".json"):
                     course_files.append(os.path.join(root, file))
         return course_files
     

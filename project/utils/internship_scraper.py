@@ -6,9 +6,17 @@ from pathlib import Path
 import time
 import datetime
 import re
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import json
+from pathlib import Path
+import time
+import datetime
+import re
 
 class InternshipScraper:
-    def __init__(self, base_url, output_dir="internship_parse"):
+    def __init__(self, base_url, output_dir="news_data"):
         self.base_url = base_url
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
@@ -16,9 +24,39 @@ class InternshipScraper:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        self.today_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        self.today_dir = self.output_dir / f"{self.today_date}_parsed_on"
+        self.today_date = datetime.datetime.now().strftime('%d_%m_%Y')
+        self.today_dir = self.output_dir / f"{self.today_date}_scraped_on"
         self.today_dir.mkdir(exist_ok=True)
+        
+        self.month_mapping = {
+            'Ιαν': '01',
+            'Φεβ': '02',
+            'Μαρ': '03',
+            'Απρ': '04',
+            'Μάι': '05',
+            'Ιούν': '06',
+            'Ιούλ': '07',
+            'Αύγ': '08',
+            'Σεπ': '09',
+            'Οκτ': '10',
+            'Νοέ': '11',
+            'Δεκ': '12'
+        }
+    
+    def format_date(self, date_str):
+        """Convert date from YYYY-GreekMonth-DD to DD_MM_YYYY format"""
+        try:
+            parts = date_str.split('-')
+            if len(parts) == 3:
+                year = parts[0]
+                month_abbr = parts[1]
+                day = parts[2]
+    
+                month_num = self.month_mapping.get(month_abbr, '00')
+                return f"{day}_{month_num}_{year}"
+            return date_str
+        except Exception:
+            return date_str
         
     def get_internship_announcements(self):
         """Fetch all internship announcement URLs from the main page"""
@@ -87,14 +125,12 @@ class InternshipScraper:
                 print(f"Scraping [{i}/{len(internship_links)}]: {url}")
                 internship_data = self.extract_internship_data(url)
                 
-                
                 slug = url.split('/')[-2] if url.split('/')[-1] == '' else url.split('/')[-1]
                 slug = re.sub(r'[^\w\-_]', '_', slug)
                 
-                
                 if internship_data['date_published']:
-                    date_str = re.sub(r'[^\w\-_]', '_', internship_data['date_published'])
-                    filename = f"{date_str}_{slug}.json"
+                    formatted_date = self.format_date(internship_data['date_published'])
+                    filename = f"{formatted_date}_{slug}.json"
                 else:
                     filename = f"{slug}.json"
                 

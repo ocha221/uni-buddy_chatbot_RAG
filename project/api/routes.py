@@ -1,40 +1,166 @@
 # api/routes.py
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from typing import List, Optional
 from pydantic import BaseModel
+import uvicorn
+import logging
+from logging.handlers import RotatingFileHandler
+import threading
+import schedule
+import time
+import os
+
 from services.course_service import CourseService
 from services.professor_service import ProfessorService
 from services.name_service import NameService
 from services.nlp_service import NLPService
+from services.news_service import NewsService
 from db.collections import Collections
-import os
+
+from services.refresh_service import RefreshService
+
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "api_service.log")
+
+file_handler = RotatingFileHandler(log_file, maxBytes=10485760, backupCount=5)
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(file_handler)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="University Information System API")
 
-app.mount("/static", StaticFiles(directory="project/site"), name="static")
+#* scheduler
+scheduler_thread = None
+scheduler_running = False
+refresh_interval = 12  
 
-@app.get("/")
-async def root():
-    return FileResponse("project/site/index.html")
 
-@app.get("/production")
-async def production():
-    return FileResponse("project/site/index-production.html")
+def get_collections():
+    return Collections()
 
-# Initialize services
+def get_name_service(collections=Depends(get_collections)):
+    nlp_service = NLPService()
+    return NameService(collections=collections, nlp_service=nlp_service)
+
+def get_news_service(collections=Depends(get_collections)):
+    return NewsService(collections=collections)
+
+def get_course_service(collections=Depends(get_collections)):
+    return CourseService(collections=collections)
+
+def get_professor_service(collections=Depends(get_collections), name_service=Depends(get_name_service)):
+    professor_service = ProfessorService(collections=collections, name_service=name_service)
+    return professor_service
+
+def get_nlp_service():
+    return NLPService()
+
+def get_refresh_service(
+    course_service=Depends(get_course_service),
+    professor_service=Depends(get_professor_service),
+    name_service=Depends(get_name_service),
+    news_service=Depends(get_news_service)
+):
+    return RefreshService(
+        course_service=course_service,
+        news_service=news_service,
+        professor_service=professor_service,
+        name_service=name_service
+    )
+
 collections = Collections()
-nlp_service = NLPService()
+nlp_service = NLPService() 
 name_service = NameService(collections, nlp_service)
 course_service = CourseService(collections)
 professor_service = ProfessorService(collections, name_service)
+news_service = NewsService(collections)
 
-# Set up service references (to avoid circular dependencies)
+#* services
 professor_service.set_course_service(course_service)
 course_service.set_professor_service(professor_service)
 
-# Models
+
+def run_scheduler():
+    """Run the scheduler loop"""
+    global scheduler_running
+    while scheduler_running:
+        schedule.run_pending()
+        time.sleep(60)
+
+def start_scheduler(interval=12):
+    """Start the scheduler thread"""
+    global scheduler_thread, scheduler_running, refresh_interval
+    
+    if scheduler_thread and scheduler_thread.is_alive():
+        logger.info("Scheduler already running, updating schedule instead")
+        schedule.clear()
+        refresh_service = RefreshService(
+            course_service=course_service,
+            news_service=news_service,
+            professor_service=professor_service,
+            name_service=name_service
+        )
+        schedule.every(interval).hours.do(refresh_service.refresh_all)
+        logger.info(f"Updated refresh schedule: every {interval} hours")
+        return True
+    
+    refresh_interval = interval
+    schedule.clear()
+    
+    if interval > 0:
+        refresh_service = RefreshService(
+            course_service=course_service,
+            news_service=news_service,
+            professor_service=professor_service,
+            name_service=name_service
+        )
+        schedule.every(interval).hours.do(refresh_service.refresh_all)
+        logger.info(f"Configured refresh schedule: every {interval} hours")
+        
+        scheduler_running = True
+        scheduler_thread = threading.Thread(target=run_scheduler)
+        scheduler_thread.daemon = True
+        scheduler_thread.start()
+        logger.info("Refresh scheduler started")
+    else:
+        logger.info("Automatic refresh disabled (interval set to 0)")
+    
+    return True
+
+def stop_scheduler():
+    """Stop the scheduler thread"""
+    global scheduler_running
+    scheduler_running = False
+    schedule.clear()
+    logger.info("Refresh scheduler stopped")
+
+app.mount("/static", StaticFiles(directory="project/site/"), name="static")
+
+@app.on_event("startup") #TODO lifespan handler alla to vlepoume afto leitourggei mia xara
+async def startup_event():
+    logger.info("API server starting up")
+    start_scheduler(refresh_interval)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("API server shutting down")
+    stop_scheduler()
+
+
+class RefreshResponse(BaseModel):
+    success: bool
+    message: str
+    courses: int = 0
+    news: int = 0
+    professors: int = 0
+
 class CourseResponse(BaseModel):
     course_code: str
     title: str
@@ -50,7 +176,134 @@ class ProfessorResponse(BaseModel):
 class QueryRequest(BaseModel):
     query: str
 
-# Routes
+
+@app.post("/api/refresh/courses", response_model=RefreshResponse)
+async def refresh_courses(background_tasks: BackgroundTasks):
+    """Refresh courses collection with latest data"""
+    def do_refresh():
+        try:
+            global_refresh_service = RefreshService(
+                course_service=course_service,
+                news_service=news_service,
+                professor_service=professor_service,
+                name_service=name_service
+            )
+            count = global_refresh_service.refresh_courses(reset=True)
+            logger.info(f"Background refresh completed: {count} courses updated")
+        except Exception as e:
+            logger.error(f"Background refresh error: {str(e)}")
+    
+    background_tasks.add_task(do_refresh)
+    return RefreshResponse(
+        success=True,
+        message="Course refresh started in background",
+    )
+
+@app.post("/api/refresh/news", response_model=RefreshResponse)
+async def refresh_news(background_tasks: BackgroundTasks):
+    """Refresh news collection with latest data"""
+    def do_refresh():
+        try:
+            global_refresh_service = RefreshService(
+                course_service=course_service,
+                news_service=news_service,
+                professor_service=professor_service,
+                name_service=name_service
+            )
+            count = global_refresh_service.refresh_news(reset=True)
+            logger.info(f"Background refresh completed: {count} news items updated")
+        except Exception as e:
+            logger.error(f"Background refresh error: {str(e)}")
+    
+    background_tasks.add_task(do_refresh)
+    return RefreshResponse(
+        success=True,
+        message="News refresh started in background",
+    )
+
+@app.post("/api/refresh/professors", response_model=RefreshResponse)
+async def refresh_professors(background_tasks: BackgroundTasks):
+    """Rebuild professor data from courses"""
+    def do_refresh():
+        try:
+            global_refresh_service = RefreshService(
+                course_service=course_service,
+                news_service=news_service,
+                professor_service=professor_service,
+                name_service=name_service
+            )
+            count = global_refresh_service.refresh_professors(consolidate=True)
+            logger.info(f"Background refresh completed: {count} professors updated")
+        except Exception as e:
+            logger.error(f"Background refresh error: {str(e)}")
+    
+    background_tasks.add_task(do_refresh)
+    return RefreshResponse(
+        success=True,
+        message="Professor refresh started in background",
+    )
+
+@app.post("/api/refresh/all", response_model=RefreshResponse)
+async def refresh_all(background_tasks: BackgroundTasks):
+    """Refresh all collections with latest data"""
+    def do_refresh():
+        try:
+            global_refresh_service = RefreshService(
+                course_service=course_service,
+                news_service=news_service,
+                professor_service=professor_service,
+                name_service=name_service
+            )
+            results = global_refresh_service.refresh_all(reset=True)
+            logger.info(f"Background full refresh completed: {results}")
+        except Exception as e:
+            logger.error(f"Background full refresh error: {str(e)}")
+    
+    background_tasks.add_task(do_refresh)
+    return RefreshResponse(
+        success=True,
+        message="Full database refresh started in background",
+    )
+
+@app.post("/api/professors/consolidate", response_model=RefreshResponse)
+async def consolidate_professors(background_tasks: BackgroundTasks):
+    """Consolidate professor names"""
+    def do_consolidate():
+        try:
+            count = professor_service.consolidate_professor_names(interactive=False)
+            logger.info(f"Background consolidation completed: {count} professor groups consolidated")
+        except Exception as e:
+            logger.error(f"Background consolidation error: {str(e)}")
+    
+    background_tasks.add_task(do_consolidate)
+    return RefreshResponse(
+        success=True,
+        message="Professor name consolidation started in background",
+    )
+
+@app.post("/api/schedule", response_model=RefreshResponse)
+async def set_schedule(hours: int = 12):
+    """Set the refresh schedule interval"""
+    start_scheduler(hours)
+    return RefreshResponse(
+        success=True,
+        message=f"Refresh schedule set to every {hours} hours",
+    )
+
+
+@app.get("/")
+async def root():
+    return FileResponse("project/site/index.html")
+
+@app.get("/production")
+async def production():
+    return FileResponse("project/site/index-production.html")
+
+@app.get("/admin")
+async def admin():
+    admin_file = "/Users/chai/modular_Rag/project/api/admin.html"
+    return FileResponse(admin_file)
+
 @app.get("/courses/search", response_model=List[CourseResponse])
 async def search_courses(query: str, limit: int = Query(5, ge=1, le=20)):
     """Search courses by content"""
@@ -165,6 +418,43 @@ async def extract_professor_name(request: QueryRequest):
     extracted_name = nlp_service.extract_professor_name(request.query)
     return {"query": request.query, "extracted_name": extracted_name}
 
+
+@app.post("/search/unified")
+async def unified_search(request: QueryRequest):
+    """Unified search endpoint that handles different query types"""
+    query = request.query.strip()
+    query_intent = nlp_service.analyze_query_intent(query)
+    if query_intent == "professor_courses":
+        professor_name = nlp_service.extract_professor_name(query)
+        if professor_name:
+            try:
+                courses = professor_service.get_courses_by_professor(professor_name)
+                if courses:
+                    canonical_name = name_service.find_canonical_name(professor_name) or professor_name
+                    course_list = format_professor_courses(courses)
+                    
+                    return {
+                        "query_type": "professor_courses",
+                        "data": {
+                            "professor_name": canonical_name,
+                            "courses": course_list
+                        },
+                        "natural_response": generate_professor_courses_response(canonical_name, course_list)
+                    }
+            except Exception:
+                pass
+    results = course_service.search_courses(query, 10) #? esto
+    if not results or not results["ids"][0]:
+        return {"query_type": "unknown", "data": None, "message": "No results found"}
+        
+    courses = format_course_results(results)
+    return {
+        "query_type": "course_search",
+        "data": courses
+    }
+
+
+
 def format_course_results(results):
     """Format course search results into a consistent structure"""
     courses = []
@@ -221,42 +511,12 @@ def generate_professor_courses_response(professor_name, courses):
     
     return response
 
-@app.post("/search/unified")
-async def unified_search(request: QueryRequest):
-    """Unified search endpoint that handles different query types"""
-    query = request.query.strip()
-    
-    # 1. Analyze query intent
-    query_intent = nlp_service.analyze_query_intent(query)
-    
-    # 2. For professor-subject matches, extract and process
-    if query_intent == "professor_courses":
-        professor_name = nlp_service.extract_professor_name(query)
-        if professor_name:
-            try:
-                courses = professor_service.get_courses_by_professor(professor_name)
-                if courses:
-                    canonical_name = name_service.find_canonical_name(professor_name) or professor_name
-                    course_list = format_professor_courses(courses)
-                    
-                    return {
-                        "query_type": "professor_courses",
-                        "data": {
-                            "professor_name": canonical_name,
-                            "courses": course_list
-                        },
-                        "natural_response": generate_professor_courses_response(canonical_name, course_list)
-                    }
-            except Exception:
-                pass
-    
-    # 3. Default to standard course search
-    results = course_service.search_courses(query, 10)
-    if not results or not results["ids"][0]:
-        return {"query_type": "unknown", "data": None, "message": "No results found"}
-        
-    courses = format_course_results(results)
-    return {
-        "query_type": "course_search",
-        "data": courses
-    }
+def start_server(host="0.0.0.0", port=8000, interval=12):
+    """Start the API server with refresh scheduling"""
+    global refresh_interval
+    refresh_interval = interval
+    logger.info(f"Starting API server on {host}:{port} with refresh interval of {interval} hours")
+    uvicorn.run(app, host=host, port=port)
+
+if __name__ == "__main__":
+    start_server()

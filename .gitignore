@@ -1,9 +1,10 @@
 chroma_db/
 course_data/
+news_data/
 env/
-internship_parse/
 __pycache__/
 *.pyc
 .DS_Store/
 .chroma_db/
 settings.py
+logs/
