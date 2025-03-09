@@ -69,7 +69,7 @@ async function naturalSearch() {
         return;
     }
     
-    resultsContainer.innerHTML = '<div class="loading">Thinking about your question</div>';
+    resultsContainer.innerHTML = '<div class="loading">Processing your query</div>';
     
     try {
         const response = await fetch('/search/unified', {
@@ -82,19 +82,110 @@ async function naturalSearch() {
         
         const data = await response.json();
         
-        if (data.query_type === "professor_courses") {
-            // Show professor courses with a natural language summary
-            displayProfessorQueryResults(data, resultsContainer);
-        } else if (data.query_type === "course_search") {
-            // Regular course search results
-            displayCourseResults(data.data, resultsContainer);
-        } else if (data.query_type === "news_internship") {
-            displayNewsResults(data.data, resultsContainer);
-           // resultsContainer.innerHTML = `<div class="info">${data.message || 'No results found for your query'}</div>`;
-        }
+        // Use generic display function instead of type-specific ones
+        displayUnifiedResults(data, resultsContainer);
     } catch (error) {
         resultsContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
+}
+
+function displayUnifiedResults(data, container) {
+    // Handle error states
+    if (!data || data.query_type === "no_results" || data.query_type === "banned_query" || data.query_type === "unknown") {
+        container.innerHTML = `<div class="info">${data.message || 'No results found for your query'}</div>`;
+        return;
+    }
+    
+    let html = '';
+    
+    // Display natural language response if available
+    if (data.natural_response) {
+        html += `
+            <div class="result-summary">
+                <p>${data.natural_response}</p>
+            </div>
+        `;
+    }
+    
+    // Process different data structures based on what's available, not on query_type
+    if (data.data) {
+        // Handle array of items
+        if (Array.isArray(data.data)) {
+            data.data.forEach(item => {
+                html += renderResultItem(item);
+            });
+        } 
+        // Handle nested data structures
+        else if (typeof data.data === 'object') {
+            // Handle professor courses
+            if (data.data.courses && Array.isArray(data.data.courses)) {
+                data.data.courses.forEach(course => {
+                    html += renderResultItem(course);
+                });
+            }
+            // Handle news items
+            else if (data.data.news_items && Array.isArray(data.data.news_items)) {
+                data.data.news_items.forEach(item => {
+                    html += renderResultItem(item.content ? {
+                        title: item.metadata?.title || "News Item",
+                        date: item.metadata?.date_published || "",
+                        content: item.content
+                    } : item);
+                });
+            }
+            // Fall back to generic object rendering
+            else {
+                html += renderGenericObject(data.data);
+            }
+        }
+    }
+    
+    container.innerHTML = html || '<div class="info">No displayable results found</div>';
+}
+
+function renderResultItem(item) {
+    let html = '<div class="result-item">';
+    
+    // Detect item type by available properties
+    if (item.title && (item.course_code || item.id)) {
+        // Course-like item
+        html += `
+            <div class="result-title">${item.title} ${item.course_code ? `(${item.course_code})` : ''}</div>
+            <div class="result-details">
+                ${item.year ? `Year: ${item.year}` : ''}
+                ${item.semester ? `, Semester: ${item.semester}` : ''}
+                ${item.ects ? `, ECTS: ${item.ects}` : ''}
+            </div>
+        `;
+    } else if (item.title || item.date) {
+        // News-like item
+        html += `
+            <div class="result-title">${item.title || "Item"}</div>
+            ${item.date ? `<div class="result-details">${item.date}</div>` : ''}
+        `;
+    }
+    
+    // Include content for any item type
+    if (item.document || item.content) {
+        html += `<div class="result-content">${item.document || item.content}</div>`;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+function renderGenericObject(obj) {
+    // Fallback for any other data structure
+    let html = '<div class="result-item">';
+    
+    for (const [key, value] of Object.entries(obj)) {
+        if (typeof value !== 'object' || value === null) {
+            html += `<div><strong>${key}:</strong> ${value}</div>`;
+        }
+    }
+    
+    html += '</div>';
+    return html;
 }
 
 async function searchCourses() {

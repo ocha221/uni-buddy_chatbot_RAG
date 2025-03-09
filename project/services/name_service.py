@@ -16,8 +16,23 @@ class NameService:
         self.professor_collection = self.collections.get_professor_collection()
         self.professor_names_collection = self.collections.get_professor_names_collection()
         self.name_cache = {}
+        self.embedding_cache = {}  # New cache for embeddings
         self.load_name_cache()
-        
+        self.load_embedding_cache()
+    
+
+    def load_embedding_cache(self):
+        """Load professor name embeddings from pickle file"""
+        embedding_path = PROFESSOR_MAPPING_PATH.replace('.pkl', '_embeddings.pkl')
+        if os.path.exists(embedding_path):
+            try:
+                with open(embedding_path, "rb") as f:
+                    self.embedding_cache = pickle.load(f)
+                logger.info(f"Loaded {len(self.embedding_cache)} professor name embeddings from cache")
+            except Exception as e:
+                logger.error(f"Error loading professor name embeddings: {e}")
+                self.embedding_cache = {}
+
     def load_name_cache(self):
         """Load professor name mappings from pickle file"""
         if os.path.exists(PROFESSOR_MAPPING_PATH):
@@ -36,7 +51,17 @@ class NameService:
                 pickle.dump(self.name_cache, f)
             logger.info(f"Saved {len(self.name_cache)} professor name mappings to cache")
         except Exception as e:
-            logger.error(f"Error saving professor name cache: {e}")
+            logger.error(f"Error saving professor name cache: {e}")          
+   
+    def save_embedding_cache(self):
+        """Save professor name embeddings to pickle file"""
+        embedding_path = PROFESSOR_MAPPING_PATH.replace('.pkl', '_embeddings.pkl')
+        try:
+            with open(embedding_path, "wb") as f:
+                pickle.dump(self.embedding_cache, f)
+            logger.info(f"Saved {len(self.embedding_cache)} professor name embeddings to cache")
+        except Exception as e:
+            logger.error(f"Error saving professor name embeddings: {e}")
     
     def add_name_variation(self, canonical_name, variation):
         """Add a name variation for a canonical professor name"""
@@ -105,38 +130,40 @@ class NameService:
             return False
     
     def find_canonical_name(self, query_name):
-        """Find the canonical name for a given professor name variation"""
+        """Find the canonical name for a given professor name variation using embedding similarity"""
         if not query_name:
             return None
 
         query_name = query_name.strip()
 
-        # Check cache first
         if query_name.lower() in self.name_cache:
             return self.name_cache[query_name.lower()]
 
-        logger.info(f"{query_name} not found in cache, searching collection...")
+        logger.info(f"{query_name} not found in cache, using embedding similarity...")
 
-        # Check for exact match in professors collection
-        try:
-            all_professors = self.professor_collection.get()
-            for i, prof in enumerate(all_professors["metadatas"]):
-                if "professor_name" in prof and query_name.lower() == prof["professor_name"].lower():
-                    self.name_cache[query_name.lower()] = prof["professor_name"]
-                    return prof["professor_name"]
-        except Exception as e:
-            logger.error(f"Error checking exact match: {str(e)}")
+        
+        if not self.embedding_cache or not self.nlp_service:
+            return None 
 
-        # Try embedding-based search
         try:
-            results = self.professor_names_collection.query(query_texts=[query_name], n_results=1)
-            if results["ids"] and len(results["ids"][0]) > 0:
-                canonical_name = results["metadatas"][0][0].get("canonical_name")
-                if canonical_name:
-                    # Update cache
-                    self.name_cache[query_name.lower()] = canonical_name
-                    return canonical_name
+            query_embedding = self.nlp_service.get_embeddings([query_name])[0]
+            
+            best_match = None
+            best_similarity = -1
+            
+            for canonical_name, embedding in self.embedding_cache.items():
+                similarity = self.nlp_service.calculate_similarity(query_embedding, embedding)
+                logger.info(f" ===== \n Comparing '{query_name}' with '{canonical_name}': similarity {similarity:.4f} \n ===== ") #TODO add to file
+                if similarity > best_similarity and similarity > SIMILARITY_THRESHOLD:
+                    best_similarity = similarity
+                    best_match = canonical_name
+            
+            if best_match:
+                self.name_cache[query_name.lower()] = best_match
+                logger.info(f"Found match for '{query_name}': '{best_match}' (similarity: {best_similarity:.4f})")
+                return best_match
+                
         except Exception as e:
-            logger.error(f"Error in embedding search: {str(e)}")
+            logger.error(f"Error in embedding similarity search: {str(e)}")
 
         return None

@@ -9,15 +9,6 @@ from config.settings import GROQ_API_KEY, GROQ_MODEL
 logger = logging.getLogger(__name__)
 
 
-NEWS_INTENT_MAPPING = {
-    IntentType.NEWS_INTERNSHIP: "type_internship_related",
-    IntentType.NEWS_STUDENT: "type_student_related",
-    IntentType.NEWS_DISTINCTIONS: "type_distinctions_awards",
-    IntentType.NEWS_EVENTS: "type_events_activities",
-    IntentType.NEWS_VACANCIES: "type_vacancies",
-}
-
-
 class NLPService:
     """Handles NLP and AI operations"""
     

@@ -1,4 +1,3 @@
-# services/professor_service.py
 import logging
 from models.professor import Professor
 from db.collections import Collections
@@ -96,42 +95,51 @@ class ProfessorService:
         else:
             logger.info(f"No canonical name found for '{professor_name}', using as-is")
         
-        # Get all professors to find matches
-        all_professors = self.professor_collection.get()
-        
-        matching_professors = []
-        for i, prof in enumerate(all_professors["metadatas"]):
-            if (
-                "professor_name" in prof
-                and professor_name.lower() in prof["professor_name"].lower()
-            ):
-                matching_professors.append({
-                    "id": all_professors["ids"][i],
-                    "metadata": prof,
-                    "document": all_professors["documents"][i] if all_professors["documents"] else None
-                })
-        
-        if not matching_professors:
+        try:
+            all_professors = self.professor_collection.get()
+            
+            matching_professors = []
+            for i, prof in enumerate(all_professors["metadatas"]):
+                if (
+                    "professor_name" in prof
+                    and professor_name.lower() in prof["professor_name"].lower()
+                ):
+                    matching_professors.append({
+                        "id": all_professors["ids"][i],
+                        "metadata": prof,
+                        "document": all_professors["documents"][i] if all_professors["documents"] else None
+                    })
+            
+            if not matching_professors:
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving professors: {str(e)}")
             return None
         
-        # Collect all course codes
-        all_course_codes = set()
-        for prof in matching_professors:
-            course_codes = prof["metadata"].get("course_codes", "").split(",")
-            all_course_codes.update([code for code in course_codes if code.strip()])
-        
-        if not all_course_codes:
+        try:
+            all_course_codes = set()
+            for prof in matching_professors:
+                course_codes = prof["metadata"].get("course_codes", "").split(",")
+                all_course_codes.update([code for code in course_codes if code.strip()])
+            
+            if not all_course_codes:
+                return None
+            logger.info(f"Found {len(all_course_codes) if all_course_codes else 0} courses for professor {canonical_name}")
+        except Exception as e:
+            logger.error(f"Error processing professor data: {str(e)}")
             return None
+        try:     
+            course_results = []
+            if self.course_service:
+                for course_code in all_course_codes:
+                    course_data = self.course_service.get_course(course_code)
+                    if course_data:
+                        course_results.append(course_data)
         
-        # Get course details
-        course_results = []
-        if self.course_service:
-            for course_code in all_course_codes:
-                course_data = self.course_service.get_course(course_code)
-                if course_data:
-                    course_results.append(course_data)
-        
-        return course_results
+            return course_results
+        except Exception as e:
+            logger.error(f"Error retrieving course data: {str(e)}")
+            return None
     
     def consolidate_professor_names(self, interactive=False):
         """Consolidate professor names using embedding similarity"""
@@ -248,7 +256,13 @@ class ProfessorService:
             # Select canonical name
             canonical_name = self._select_canonical_name(group)
             logger.info(f"Selected canonical name: '{canonical_name}' for group: {group}")
-
+            try:
+                embeddings = self.name_service.nlp_service.get_embeddings([canonical_name])
+                self.name_service.embedding_cache[canonical_name] = embeddings[0]
+                logger.info(f"Generated and stored embedding for canonical name '{canonical_name}'")
+            except Exception as e:
+                logger.error(f"Error generating embedding for canonical name '{canonical_name}': {str(e)}")
+            
             if interactive:
                 print("\n" + "=" * 60)
                 print(f"PROFESSOR GROUP {group_index+1}/{len(name_groups)}")
@@ -324,6 +338,7 @@ class ProfessorService:
 
         # Save the name cache
         self.name_service.save_name_cache()
+        self.name_service.save_embedding_cache()
         
         merge_duration = time.time() - step3_start
         logger.info(f"STEP 3 completed in {merge_duration:.2f}s")

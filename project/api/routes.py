@@ -494,6 +494,7 @@ async def unified_search(request: QueryRequest):
         professor_name = nlp_service.extract_professor_name(query)
         if professor_name:
             try:
+               # logging.debug(f"\n\nExtracted professor name: {professor_name}\n\n")
                 courses = professor_service.get_courses_by_professor(professor_name)
                 if courses:
                     canonical_name = (
@@ -512,6 +513,12 @@ async def unified_search(request: QueryRequest):
                             canonical_name, course_list
                         ),
                     }
+                else:
+                   return {
+                "query_type": "no_results",
+                "data": None,
+                "message": f"No courses found for professor {professor_name}."
+            }
             except Exception as e:
                 logger.error(f"Error processing professor query: {str(e)}")
 
