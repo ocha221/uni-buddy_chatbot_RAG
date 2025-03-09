@@ -95,6 +95,31 @@ class ProfessorService:
         else:
             logger.info(f"No canonical name found for '{professor_name}', using as-is")
         
+        prof_id = f"professor_{professor_name.replace(' ', '_').lower()}"
+        try:
+            print(f"trying exact match for {prof_id}")
+            exact_match = self.professor_collection.get(ids=[prof_id])
+            
+            if exact_match and len(exact_match["ids"]) > 0:
+               
+                metadata = exact_match["metadatas"][0]
+                course_codes = metadata.get("course_codes", "").split(",")
+                course_codes = [code for code in course_codes if code.strip()]
+                
+                logger.info(f"Found {len(course_codes)} courses for professor {professor_name} via direct lookup")
+                
+                course_results = []
+                if self.course_service and course_codes:
+                    for course_code in course_codes:
+                        course_data = self.course_service.get_course(course_code)
+                        if course_data:
+                            course_results.append(course_data)
+                return course_results
+        except Exception as e:
+            logger.error(f"Error retrieving professor {professor_name}: {str(e)}\n continuing with full search")
+        
+        #! full db search
+        logger.info(f"full db scan...")
         try:
             all_professors = self.professor_collection.get()
             
