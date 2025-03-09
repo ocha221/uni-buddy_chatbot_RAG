@@ -1,0 +1,119 @@
+<!-- api/static/admin.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>University Information System - Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        .card { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .result { margin-top: 15px; padding: 10px; background-color: #f0f0f0; border-radius: 5px; }
+        .form-row { margin-bottom: 10px; }
+        .form-row label { display: inline-block; min-width: 150px; }
+        .form-row input { padding: 5px; width: 250px; }
+    </style>
+</head>
+<body>
+    <h1>Database Refresh Controls</h1>
+    
+    <div class="card">
+        <h2>Manual Refresh</h2>
+        <button onclick="refreshData('courses')">Refresh Courses</button>
+        <button onclick="refreshData('news')">Refresh News</button>
+        <button onclick="refreshData('professors')">Rebuild Professors</button>
+        <button onclick="refreshData('all')">Refresh All</button>
+        <div id="manualResult" class="result"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Schedule Settings</h2>
+        <label for="hours">Refresh interval (hours):</label>
+        <input type="number" id="hours" value="12" min="1" max="168">
+        <button onclick="setSchedule()">Set Schedule</button>
+        <div id="scheduleResult" class="result"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Professor Name Management</h2>
+        <button onclick="consolidateNames()">Consolidate Professor Names</button>
+        <div class="form-row" style="margin-top: 15px;">
+            <label for="canonicalName">Canonical Name:</label>
+            <input type="text" id="canonicalName" placeholder="Enter canonical professor name">
+        </div>
+        <div class="form-row">
+            <label for="nameVariation">Name Variation:</label>
+            <input type="text" id="nameVariation" placeholder="Enter name variation">
+        </div>
+        <button onclick="addNameVariation()">Add Name Variation</button>
+        <div id="nameResult" class="result"></div>
+    </div>
+    
+    <script>
+        async function refreshData(type) {
+            document.getElementById('manualResult').textContent = `Starting ${type} refresh...`;
+            try {
+                const response = await fetch(`/api/refresh/${type}`, {
+                    method: 'POST',
+                });
+                const data = await response.json();
+                document.getElementById('manualResult').textContent = data.message;
+            } catch (error) {
+                document.getElementById('manualResult').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function setSchedule() {
+            const hours = document.getElementById('hours').value;
+            document.getElementById('scheduleResult').textContent = `Setting schedule...`;
+            try {
+                const response = await fetch(`/api/schedule?hours=${hours}`, {
+                    method: 'POST',
+                });
+                const data = await response.json();
+                document.getElementById('scheduleResult').textContent = data.message;
+            } catch (error) {
+                document.getElementById('scheduleResult').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function consolidateNames() {
+            document.getElementById('nameResult').textContent = 'Starting professor name consolidation...';
+            try {
+                const response = await fetch('/api/professors/consolidate', {
+                    method: 'POST',
+                });
+                const data = await response.json();
+                document.getElementById('nameResult').textContent = data.message;
+            } catch (error) {
+                document.getElementById('nameResult').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function addNameVariation() {
+            const canonicalName = document.getElementById('canonicalName').value.trim();
+            const variation = document.getElementById('nameVariation').value.trim();
+            
+            if (!canonicalName || !variation) {
+                document.getElementById('nameResult').textContent = 'Both canonical name and variation must be provided';
+                return;
+            }
+            
+            document.getElementById('nameResult').textContent = 'Adding name variation...';
+            try {
+                const response = await fetch(`/api/professors/add-variation?canonical_name=${encodeURIComponent(canonicalName)}&variation=${encodeURIComponent(variation)}`, {
+                    method: 'POST',
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('nameResult').textContent = `Successfully added "${variation}" as a variation of "${canonicalName}"`;
+                    document.getElementById('nameVariation').value = '';
+                } else {
+                    document.getElementById('nameResult').textContent = 'Failed to add name variation';
+                }
+            } catch (error) {
+                document.getElementById('nameResult').textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

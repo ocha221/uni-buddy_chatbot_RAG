@@ -88,8 +88,9 @@ async function naturalSearch() {
         } else if (data.query_type === "course_search") {
             // Regular course search results
             displayCourseResults(data.data, resultsContainer);
-        } else {
-            resultsContainer.innerHTML = `<div class="info">${data.message || 'No results found for your query'}</div>`;
+        } else if (data.query_type === "news_internship") {
+            displayNewsResults(data.data, resultsContainer);
+           // resultsContainer.innerHTML = `<div class="info">${data.message || 'No results found for your query'}</div>`;
         }
     } catch (error) {
         resultsContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
@@ -308,6 +309,27 @@ function displayProfessorResults(professorData, container) {
                     ${course.ects ? `, ECTS: ${course.ects}` : ''}
                 </div>
                 <div class="result-content">${course.document}</div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function displayNewsResults(data, container) {
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="error">No news found</div>';
+        return;
+    }
+    
+    let html = '';
+    
+    data.forEach(item => {
+        html += `
+            <div class="result-item">
+                <div class="result-title">${item.title}</div>
+                <div class="result-details">${item.date}</div>
+                <div class="result-content">${item.content}</div>
             </div>
         `;
     });

@@ -1,11 +1,22 @@
 # services/nlp_service.py
 import logging
+from models.intent_mappings import IntentType
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 import numpy as np
 from config.settings import GROQ_API_KEY, GROQ_MODEL
 
 logger = logging.getLogger(__name__)
+
+
+NEWS_INTENT_MAPPING = {
+    IntentType.NEWS_INTERNSHIP: "type_internship_related",
+    IntentType.NEWS_STUDENT: "type_student_related",
+    IntentType.NEWS_DISTINCTIONS: "type_distinctions_awards",
+    IntentType.NEWS_EVENTS: "type_events_activities",
+    IntentType.NEWS_VACANCIES: "type_vacancies",
+}
+
 
 class NLPService:
     """Handles NLP and AI operations"""
@@ -105,20 +116,38 @@ Output: "Papadopoulos"
     def analyze_query_intent(self, query):
         """
         Analyze the intent of a user query
-        Returns one of: "course_search", "professor_courses", "course_filtering", "general_info"
+        Returns one of the IntentType constants
         """
         try:
             system_prompt = """
     You are analyzing user queries for a university information system.
     Classify the query into exactly ONE of these categories:
+
     - "professor_courses": Questions about what courses a professor teaches
     - "course_search": Searching for specific course content or topics
     - "course_filtering": Filtering courses by year, semester, etc.
+    - "news_internship": Questions about internship or practical training announcements
+    - "news_ptixiaki": Questions about thesis or dissertation announcements 
+    - "news_student": Questions about student-related news and announcements
+    - "news_distinctions": Questions about distinctions, awards, or recognitions
+    - "news_events": Questions about university events, activities, or seminars
+    - "news_vacancies": Questions about job openings or position vacancies
+    - "news_general": General news inquiries not fitting into other news categories
     - "general_info": General questions about the university
-    - "news_internship": Questions about internship announcements
-    - "news_ptixiaki": Questions about thesis announcements
-    - "news_general": General news inquiries
     - "unknown": Unrecognized or irrelevant queries
+    - "banned_query": Nonsensical, obscene or hateful queries
+
+    Examples:
+    - "What courses does Professor Smith teach?" → "professor_courses"
+    - "Tell me about programming courses" → "course_search" 
+    - "Which courses are in the 3rd semester?" → "course_filtering"
+    - "Are there any internship announcements?" → "news_internship"
+    - "Latest thesis opportunities" → "news_ptixiaki"
+    - "Student announcements this week" → "news_student"
+    - "Recent university awards" → "news_distinctions"
+    - "Upcoming university events" → "news_events"
+    - "Open job positions at the university" → "news_vacancies"
+    - "What's new at the university?" → "news_general"
 
     Return ONLY the category name, nothing else.
     """
@@ -129,22 +158,51 @@ Output: "Papadopoulos"
 
             response = self.llm.invoke(messages)
             intent = response.content.strip().lower()
+            intent_mapping = {
+                "professor_courses": IntentType.PROFESSOR_COURSES,
+                "professor course": IntentType.PROFESSOR_COURSES,
+                "professor": IntentType.PROFESSOR_COURSES,
+                "course_search": IntentType.COURSE_SEARCH,
+                "course search": IntentType.COURSE_SEARCH,
+                "course_filtering": IntentType.COURSE_FILTERING,
+                "course filter": IntentType.COURSE_FILTERING,
+                "news_internship": IntentType.NEWS_INTERNSHIP,
+                "internship": IntentType.NEWS_INTERNSHIP,
+                "news_ptixiaki": IntentType.NEWS_THESIS,
+                "thesis": IntentType.NEWS_THESIS,
+                "ptixiaki": IntentType.NEWS_THESIS,
+                "news_student": IntentType.NEWS_STUDENT,
+                "student news": IntentType.NEWS_STUDENT,
+                "news_distinctions": IntentType.NEWS_DISTINCTIONS,
+                "distinctions": IntentType.NEWS_DISTINCTIONS,
+                "awards": IntentType.NEWS_DISTINCTIONS,
+                "news_events": IntentType.NEWS_EVENTS,
+                "events": IntentType.NEWS_EVENTS,
+                "news_vacancies": IntentType.NEWS_VACANCIES,
+                "vacancies": IntentType.NEWS_VACANCIES,
+                "news_general": IntentType.NEWS_GENERAL,
+                "news": IntentType.NEWS_GENERAL,
+                "general_info": IntentType.GENERAL_INFO,
+                "general": IntentType.GENERAL_INFO,
+                "unknown": IntentType.UNKNOWN
+            }
             
-            # Normalize the response
-            if "professor" in intent:
-                return "professor_courses"
-            elif "filter" in intent or "year" in intent or "semester" in intent:
-                return "course_filtering"
-            elif "course" in intent or "search" in intent:
-                return "course_search"
-            else:
-                return "general_info"
+            if intent in intent_mapping:
+                if intent == "banned_query":
+                    pass #TODO add logging snitch :)
+
+                return intent_mapping[intent]
+            
+            for key, value in intent_mapping.items():
+                if key in intent:
+                    return value
+                    
+            return IntentType.UNKNOWN #todo stuff?
                 
         except Exception as e:
             logger.error(f"Error analyzing query intent: {str(e)}")
-            return "course_search"  # Default fallback
-   
-        
+            return IntentType.GENERAL_INFO  #?? 
+
     def get_embeddings(self, texts):
         """Generate embeddings for a list of texts"""
         import chromadb.utils.embedding_functions as embedding_functions
