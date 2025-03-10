@@ -91,25 +91,25 @@ class NewsService:
             if query_intent == IntentType.BANNED_QUERY:
                 return None
             
-            intents = [query_intent] if isinstance(query_intent, str) else query_intent
             
-           
-            where_clause = None
-            if intents and any(i in NEWS_INTENT_MAPPING for i in intents):
-                where_conditions = []
-                for intent in intents:
-                    if intent in NEWS_INTENT_MAPPING:
-                        field = NEWS_INTENT_MAPPING[intent]
-                        where_conditions.append({field: True})
+            where_clause = None #* aftomato skip otan einai general
+            
+            if query_intent != IntentType.NEWS_GENERAL:
+                intents = [query_intent] if isinstance(query_intent, str) else query_intent
                 
-              
-                if len(where_conditions) > 1:
-                    where_clause = {"$or": where_conditions}
-                elif len(where_conditions) == 1:
-                    where_clause = where_conditions[0]
-                
-            #
-            if max_days_old: #todo
+                if intents and any(i in NEWS_INTENT_MAPPING for i in intents):
+                    where_conditions = []
+                    for intent in intents:
+                        if intent in NEWS_INTENT_MAPPING:
+                            field = NEWS_INTENT_MAPPING[intent]
+                            where_conditions.append({field: True})
+                    
+                    if len(where_conditions) > 1:
+                        where_clause = {"$or": where_conditions}
+                    elif len(where_conditions) == 1:
+                        where_clause = where_conditions[0]
+            
+            if max_days_old:
                 import time
                 cutoff_epoch = int(time.time()) - (max_days_old * 86400)
                 
@@ -136,7 +136,7 @@ class NewsService:
                         "id": results["ids"][0][i],
                         "distance": results["distances"][0][i] if "distances" in results else 1.0
                     })
-                
+                #todo todo todo
                 #? (similarity_score * 0.7) + (recency_bonus * 0.3)
                 #? to recency logika thelei parapanw 
                 import time
@@ -166,6 +166,8 @@ class NewsService:
             logger.error(f"Error searching news with query '{query}': {str(e)}")
             return None
 
+    
+    
     def print_all_news(self):
         """self explanatory lol"""
         try:
