@@ -265,7 +265,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
 
             response = self.llm.invoke(messages)
             extracted_info = response.content.strip()
-            parsed_info = eval(extracted_info)  
+            parsed_info = eval(extracted_info)
 
             if len(parsed_info) != 3:
                 logger.error(
@@ -715,7 +715,6 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             return []
 
         if intent == IntentType.NEWS_GENERAL:
-
             return sorted(
                 content_items,
                 key=lambda x: -x.get("metadata", {}).get(

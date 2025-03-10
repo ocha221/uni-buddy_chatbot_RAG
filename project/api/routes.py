@@ -371,7 +371,7 @@ async def filter_courses(
     semester: Optional[int] = None,
     limit: int = Query(10, ge=1, le=100),
 ):
-    #todo later
+    # todo later
     """Filter courses by year and semester"""
     filters = {}
     if year is not None:
@@ -387,7 +387,7 @@ async def filter_courses(
             {"semester": filters["semester"]},
             {"year": filters["year"]},
         ]
-        
+
     results = course_service.filter_courses(filters, limit)
     if not results or not results["ids"][0]:
         return []
@@ -483,26 +483,19 @@ async def unified_search(request: QueryRequest):
     query_intent = nlp_service.analyze_query_intent(query)
     logger.info(f"Query: '{query}' classified as '{query_intent}'")
     data, message, query_type = nlp_service.process_unified_query(
-        query, 
+        query,
         query_intent,
         news_service=news_service,
         professor_service=professor_service,
         course_service=course_service,
-        name_service=name_service
+        name_service=name_service,
     )
 
     if query_type in ["banned_query", "unknown", "no_results", "error"]:
-        return {
-            "query_type": query_type,
-            "data": None,
-            "message": message
-        }
-    
-    return {
-        "query_type": query_type,
-        "data": data,
-        "natural_response": message
-    }
+        return {"query_type": query_type, "data": None, "message": message}
+
+    return {"query_type": query_type, "data": data, "natural_response": message}
+
 
 def format_course_results(results):  # ?
     """Format course search results into a consistent structure"""
@@ -563,12 +556,12 @@ async def debug_news_search(query: str, intent: Optional[str] = None):
     intent_type = None
     if intent:
         for attr_name in dir(IntentType):
-            if not attr_name.startswith('__'):
+            if not attr_name.startswith("__"):
                 attr_value = getattr(IntentType, attr_name)
                 if attr_value == intent:
                     intent_type = attr_value
                     break
-    
+
     debug_info = news_service.debug_search(query, intent_type)
     return debug_info
 
