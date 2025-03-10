@@ -245,10 +245,10 @@ class ProfessorService:
                     embedding2 = name_to_embedding[compare_name]
                     similarity = self.name_service.nlp_service.calculate_similarity(embedding1, embedding2)
 
-                    if similarity > SIMILARITY_THRESHOLD:
+                    if similarity > 0.75:
                         current_group.append(compare_name)
                         processed_names.add(compare_name)
-                        logger.info(f"Grouped '{compare_name}' with '{name}' (similarity: {similarity:.4f})")
+                        logger.info(f"==== \n Grouped '{compare_name}' with '{name}' (similarity: {similarity:.4f}) \n====")
                 except Exception as e:
                     logger.error(f"Error calculating similarity between '{name}' and '{compare_name}': {str(e)}")
                     continue

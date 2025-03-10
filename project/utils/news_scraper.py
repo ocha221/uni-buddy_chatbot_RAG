@@ -59,6 +59,22 @@ class NewsScraper:
         except Exception:
             return date_str
 
+    def classify_news_by_keywords(self, content):
+        keywords = {
+            "internship-related": ["πρακτική", "άσκηση", "internship", "πρακτικη", "ασκηση"],
+            "student-related": ["φοιτητ", "σπουδαστ", "εξάμην", "φοιτητές", "μαθητ", "εξεταστική", "διαλέξ"],
+            "distinctions-awards": ["διάκρισ", "βραβε", "award", "βραβείο", "αριστεί", "διακρίθηκ"],
+            "events-activities": ["εκδήλωση", "σεμινάριο", "workshop", "διάλεξη", "ημερίδα", "συνέδριο", "παρουσίαση"],
+            "vacancies": ["θέση", "προκήρυξη", "vacancy", "διδασκόντων", "πρόσληψη", "αίτηση", "εργασία"]
+        }
+        
+        detected_types = []
+        for type_name, words in keywords.items():
+            if any(word in content for word in words):
+                detected_types.append(type_name)
+        
+        return detected_types
+
     def get_news(self):
         """Fetch all news from #"""
         response = requests.get(self.base_url, headers=self.headers)
@@ -108,7 +124,15 @@ class NewsScraper:
                 if link_text in type_mapping:
                     news_types.append(type_mapping[link_text])
 
-        news_data["news_types"] = news_types
+        if not news_types or len(news_types) < 2:  
+            content_for_classification = f"{news_data['title']} {news_data['content']}".lower()
+            keyword_types = self.classify_news_by_keywords(content_for_classification)
+            
+            for kw_type in keyword_types:
+                if kw_type not in news_types:
+                    news_types.append(kw_type)
+                    
+        news_data["news_types"] = news_types or ["general"]
 
         if news_data["date_published"]:
             try:

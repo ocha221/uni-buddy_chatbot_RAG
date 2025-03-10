@@ -475,100 +475,29 @@ async def unified_search(request: QueryRequest):
     query = request.query.strip()
     query_intent = nlp_service.analyze_query_intent(query)
     logger.info(f"Query: '{query}' classified as '{query_intent}'")
-    # TODO add like
-    # TODO logging and stuff, print to file when banned q's or something. can also log like ip etc/device metadata
-    # TODO eclass stuff if logged in? やばいいい
-    if query_intent == IntentType.BANNED_QUERY:
+    data, message, query_type = nlp_service.process_unified_query(
+        query, 
+        query_intent,
+        news_service=news_service,
+        professor_service=professor_service,
+        course_service=course_service,
+        name_service=name_service
+    )
+
+    if query_type in ["banned_query", "unknown", "no_results", "error"]:
         return {
-            "query_type": "banned_query",
+            "query_type": query_type,
             "data": None,
-            "message": "Query is not allowed.",
+            "message": message
         }
-    if query_intent == IntentType.UNKNOWN:
-        return {
-            "query_type": "unknown",
-            "data": None,
-            "message": "Sorry! Can you please rephrase your question?",
-        }
-    if query_intent == IntentType.PROFESSOR_COURSES:
-        professor_name = nlp_service.extract_professor_name(query)
-        if professor_name:
-            try:
-               # logging.debug(f"\n\nExtracted professor name: {professor_name}\n\n")
-                courses = professor_service.get_courses_by_professor(professor_name)
-                if courses:
-                    canonical_name = (
-                        name_service.find_canonical_name(professor_name)
-                        or professor_name
-                    )
-                    course_list = format_professor_courses(courses)
+    
+    return {
+        "query_type": query_type,
+        "data": data,
+        "natural_response": message
+    }
 
-                    return {
-                        "query_type": query_intent,
-                        "data": {
-                            "professor_name": canonical_name,
-                            "courses": course_list,
-                        },
-                        "natural_response": generate_professor_courses_response(
-                            canonical_name, course_list
-                        ),
-                    }
-                else:
-                   return {
-                "query_type": "no_results",
-                "data": None,
-                "message": f"No courses found for professor {professor_name}."
-            }
-            except Exception as e:
-                logger.error(f"Error processing professor query: {str(e)}")
-
-    if query_intent in NEWS_INTENT_MAPPING:
-        """return {
-            "query_type": query_intent,
-            "data": None,
-            "message": f"Query '{query}' is not allowed.",
-        }"""
-        results = news_service.search_news(query, query_intent=query_intent, limit=10)
-        if results and results.get("documents") and results["documents"][0]:
-            news_items = []
-            for i in range(len(results["documents"][0])):
-                news_items.append(
-                    {
-                        "content": results["documents"][0][i],
-                        "metadata": (
-                            results["metadatas"][0][i]
-                            if "metadatas" in results and results["metadatas"][0]
-                            else {}
-                        ),
-                    }
-                )
-
-            return {
-                "query_type": query_intent,
-                "data": {"news_items": news_items},
-                "natural_response": generate_news_response(query_intent, news_items),
-            }
-
-    if query_intent == IntentType.COURSE_FILTERING:
-        # TODO llm that pulls like year/semester data :)
-        results = course_service.search_courses(query, 10)
-        if results and results["ids"][0]:
-            courses = format_course_results(results)
-            return {"query_type": query_intent, "data": courses}
-
-    results = course_service.search_courses(query, 10)
-    if not results or not results["ids"][0]:
-        return {
-            "query_type": "no_results",
-            "data": None,
-            "message": "No results found for your query.",
-        }
-
-    courses = format_course_results(results)
-    return {"query_type": IntentType.COURSE_SEARCH, "data": courses}
-
-
-def format_course_results(results):  #?
+def format_course_results(results):  # ?
     """Format course search results into a consistent structure"""
     courses = []
     for i in range(len(results["ids"][0])):
@@ -602,65 +531,6 @@ def format_professor_courses(courses):
     return course_list
 
 
-def generate_professor_courses_response(professor_name, courses):
-    """Generate a natural language response about professor courses"""
-    if not courses:
-        return f"I couldn't find any courses taught by Professor {professor_name}."
-
-    # Group courses by year and semester
-    courses_by_year_sem = {}
-    for course in courses:
-        key = (course.get("year", 0), course.get("semester", 0))
-        if key not in courses_by_year_sem:
-            courses_by_year_sem[key] = []
-        courses_by_year_sem[key].append(course)
-
-    response = f"Professor {professor_name} teaches {len(courses)} courses:\n\n"
-
-    for (year, semester), year_courses in sorted(courses_by_year_sem.items()):
-        if year > 0 and semester > 0:
-            response += f"Year {year}, Semester {semester}:\n"
-
-        for course in year_courses:
-            response += f"• {course['title']} ({course['course_code']})"
-            if course.get("ects"):
-                response += f", {course['ects']} ECTS"
-            response += "\n"
-        response += "\n"
-
-    return response
-
-
-def generate_news_response(intent, news_items):
-    """Generate a natural language response for news queries"""
-    if not news_items:
-        return "I couldn't find any relevant news announcements."
-    
-    intent_titles = {
-        IntentType.NEWS_INTERNSHIP: "internship announcements",
-        IntentType.NEWS_THESIS: "thesis opportunities",
-        IntentType.NEWS_STUDENT: "student-related announcements",
-        IntentType.NEWS_DISTINCTIONS: "distinction and award announcements",
-        IntentType.NEWS_EVENTS: "upcoming events",
-        IntentType.NEWS_VACANCIES: "vacancy announcements",
-        IntentType.NEWS_GENERAL: "news announcements"
-    }
-    
-    title = intent_titles.get(intent, "announcements")
-    response = f"Here are the latest {title}:\n\n"
-    
-    for i, item in enumerate(news_items[:5], 1):
-        response += f"{i}. {item['metadata'].get('title', 'Announcement')}"
-        if 'date_published' in item['metadata']:
-            response += f" ({item['metadata']['date_published']})"
-        response += "\n"
-        content = item['content']
-        if len(content) > 150:
-            content = content[:150] + "..."
-        response += f"{content}\n\n"
-    
-    return response
-
 @app.get("/api/printnews")
 async def print_all_news():
     """Print all news entries in the collection"""
@@ -680,9 +550,24 @@ def start_server(host="0.0.0.0", port=8000, interval=12):
     uvicorn.run(app, host=host, port=port)
 
 
+@app.get("/api/debug/news")
+async def debug_news_search(query: str, intent: Optional[str] = None):
+    """Debug endpoint for news search"""
+    intent_type = None
+    if intent:
+        for attr_name in dir(IntentType):
+            if not attr_name.startswith('__'):
+                attr_value = getattr(IntentType, attr_name)
+                if attr_value == intent:
+                    intent_type = attr_value
+                    break
+    
+    debug_info = news_service.debug_search(query, intent_type)
+    return debug_info
+
+
 if __name__ == "__main__":
     start_server()
 
 
-
-#TODO move all the response stuff to nlp_service / ta antoistixa genika
+# TODO move all the response stuff to nlp_service / ta antoistixa genika

@@ -24,3 +24,4 @@ NEWS_INTENT_MAPPING = {
     IntentType.NEWS_GENERAL: "type_general",
 }
 
+
