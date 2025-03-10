@@ -371,6 +371,7 @@ async def filter_courses(
     semester: Optional[int] = None,
     limit: int = Query(10, ge=1, le=100),
 ):
+    #todo later
     """Filter courses by year and semester"""
     filters = {}
     if year is not None:
@@ -381,6 +382,12 @@ async def filter_courses(
     if year is not None or semester is not None:
         limit = 27
 
+    if filters["semester"] != None and filters["year"] != None:
+        filters["$and"] = [
+            {"semester": filters["semester"]},
+            {"year": filters["year"]},
+        ]
+        
     results = course_service.filter_courses(filters, limit)
     if not results or not results["ids"][0]:
         return []
