@@ -21,5 +21,6 @@ NEWS_INTENT_MAPPING = {
     IntentType.NEWS_DISTINCTIONS: "type_distinctions_awards",
     IntentType.NEWS_EVENTS: "type_events_activities",
     IntentType.NEWS_VACANCIES: "type_vacancies",
+    IntentType.NEWS_GENERAL: "type_general",
 }
 

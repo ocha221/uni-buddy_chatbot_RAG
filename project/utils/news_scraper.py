@@ -180,5 +180,5 @@ class NewsScraper:
 
 
 if __name__ == "__main__":
-    scraper = NewsScraper("https://ds.uth.gr/announcements/internship-related/")
+    scraper = NewsScraper("https://ds.uth.gr/announcements/")
     scraper.scrape_news()

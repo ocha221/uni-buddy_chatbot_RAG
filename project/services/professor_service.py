@@ -274,9 +274,17 @@ class ProfessorService:
             if interactive:
                 print(f"\r[DEBUG] Processing group {group_index+1}/{len(name_groups)}...", end="", flush=True)
 
-            if len(group) <= 1:
-                logger.info(f"Group {group_index+1} has only one name, skipping")
-                continue
+            if len(group) == 1:
+                single_name = group[0]
+                logger.info(f"Group {group_index+1} has only one name, generating embedding for '{single_name}'")
+                try:
+                    embeddings = self.name_service.nlp_service.get_embeddings([single_name])
+                    self.name_service.embedding_cache[single_name] = embeddings[0]
+                    logger.info(f"Generated and stored embedding for single name '{single_name}'")
+                    self.name_service.add_name_variation(single_name, single_name)
+                except Exception as e:
+                    logger.error(f"Error generating embedding for single name '{single_name}': {str(e)}")
+                continue  
 
             # Select canonical name
             canonical_name = self._select_canonical_name(group)

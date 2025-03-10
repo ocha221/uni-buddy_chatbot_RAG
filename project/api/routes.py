@@ -523,6 +523,11 @@ async def unified_search(request: QueryRequest):
                 logger.error(f"Error processing professor query: {str(e)}")
 
     if query_intent in NEWS_INTENT_MAPPING:
+        """return {
+            "query_type": query_intent,
+            "data": None,
+            "message": f"Query '{query}' is not allowed.",
+        }"""
         results = news_service.search_news(query, query_intent=query_intent, limit=10)
         if results and results.get("documents") and results["documents"][0]:
             news_items = []
