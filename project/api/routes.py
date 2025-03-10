@@ -17,6 +17,7 @@ from services.professor_service import ProfessorService
 from services.name_service import NameService
 from services.nlp_service import NLPService
 from services.news_service import NewsService
+from services.chat_service import ChatService
 from models.intent_mappings import IntentType, NEWS_INTENT_MAPPING
 from db.collections import Collections
 
@@ -95,6 +96,7 @@ name_service = NameService(collections, nlp_service)
 course_service = CourseService(collections)
 professor_service = ProfessorService(collections, name_service)
 news_service = NewsService(collections)
+chat_service = ChatService(nlp_service)
 
 # * services
 professor_service.set_course_service(course_service)
@@ -199,6 +201,10 @@ class ProfessorResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
 
 
 @app.post("/api/refresh/courses", response_model=RefreshResponse)
@@ -496,40 +502,18 @@ async def unified_search(request: QueryRequest):
 
     return {"query_type": query_type, "data": data, "natural_response": message}
 
-
-def format_course_results(results):  # ?
-    """Format course search results into a consistent structure"""
-    courses = []
-    for i in range(len(results["ids"][0])):
-        courses.append(
-            {
-                "course_code": results["ids"][0][i],
-                "title": results["metadatas"][0][i].get("title", "Unknown"),
-                "year": results["metadatas"][0][i].get("year", 0),
-                "semester": results["metadatas"][0][i].get("semester", 0),
-                "ects": results["metadatas"][0][i].get("ects"),
-                "document": results["documents"][0][i],
-            }
-        )
-    return courses
-
-
-def format_professor_courses(courses):
-    """Format professor courses into a consistent structure"""
-    course_list = []
-    for course in courses:
-        course_list.append(
-            {
-                "course_code": course["course_code"],
-                "title": course["metadata"].get("title", "Unknown"),
-                "year": course["metadata"].get("year", 0),
-                "semester": course["metadata"].get("semester", 0),
-                "ects": course["metadata"].get("ects"),
-                "document": course["document"],
-            }
-        )
-    return course_list
-
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """Chat endpoint that maintains conversation context"""
+    return None #TODO 
+    return chat_service.process_message(
+        request.session_id,
+        request.message,
+        news_service=news_service,
+        professor_service=professor_service,
+        course_service=course_service,
+        name_service=name_service
+    )
 
 @app.get("/api/printnews")
 async def print_all_news():

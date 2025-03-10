@@ -4,9 +4,10 @@ from models.intent_mappings import IntentType, NEWS_INTENT_MAPPING
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 import numpy as np
-from config.settings import GROQ_API_KEY, GROQ_MODEL
+from config.settings import GROQ_API_KEY, GROQ_MODEL, SIMILARITY_THRESHOLD
 
 from services.course_service import CourseService
+from services.response_formatter import ResponseFormatter
 from db.collections import Collections
 from models.prompt_map import PROMPT_MAP
 
@@ -23,11 +24,12 @@ class NLPService:
             self.llm = ChatGroq(
                 model=GROQ_MODEL, temperature=0.1, groq_api_key=GROQ_API_KEY
             )
+            self.formatter = ResponseFormatter()
             logger.info(f"Initialized Groq LLM with model: {GROQ_MODEL}")
         except Exception as e:
             logger.error(f"Failed to initialize Groq LLM: {str(e)}")
             self.llm = None
-
+            
     def extract_professor_name(self, query):
         """Extract professor name from query using LLM"""
         if not self.llm:
@@ -329,16 +331,32 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             professor_name = self.extract_professor_name(query)
             if professor_name and professor_service:
                 try:
+                    
+                    if hasattr(name_service, "find_canonical_name_with_confidence"):
+                        canonical_name, confidence = name_service.find_canonical_name_with_confidence(professor_name)
+
+                        confidence = float(confidence) if confidence is not None else 0.0
+                        if canonical_name and confidence < SIMILARITY_THRESHOLD:
+                            metadata = {
+                                "clarification_needed": True,
+                                "candidate_match": canonical_name,
+                                "confidence": confidence
+                            } #TODO with chat_Service
+                            return metadata, f"I found a professor named '{canonical_name}' that seems similar to '{professor_name}'. Is that who you meant?", "clarification_request"
+                        
+                        if canonical_name:
+                            professor_name = canonical_name
+                    else:
+                        #* fallback
+                        canonical_name = name_service.find_canonical_name(professor_name) or professor_name
+                        professor_name = canonical_name
+                    
                     courses = professor_service.get_courses_by_professor(professor_name)
                     if courses:
-                        canonical_name = (
-                            name_service.find_canonical_name(professor_name)
-                            or professor_name
-                        )
-                        course_list = self._format_courses_for_data(courses)
+                        course_list = self.formatter._format_courses_for_data(courses)
 
                         context_data = {
-                            "professor_name": canonical_name,
+                            "professor_name": professor_name,
                             "courses": course_list,
                         }
 
@@ -356,7 +374,8 @@ return ONLY the classification as a list of three elements: [year, semester, yea
                 except Exception as e:
                     logger.error(f"Error processing professor query: {str(e)}")
                     return None, "An error occurred processing your query.", "error"
-
+       
+       
         if query_intent == IntentType.NEWS_GENERAL:
             specific_news_intent = self.analyze_news_intent(query)
             logger.info(f"Second-stage classification: {specific_news_intent}")
@@ -458,7 +477,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
                     results = course_service.filter_courses(filters, limit)
 
                     if results and results.get("ids") and results["ids"][0]:
-                        courses = self._format_courses_for_data(results)
+                        courses = self.formatter._format_courses_for_data(results)
 
                         context_data = {"courses": courses}
                         natural_response = self.generate_response(
@@ -482,7 +501,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
                 try:
                     results = course_service.search_courses(query, 10)
                     if results and results.get("ids") and results["ids"][0]:
-                        courses = self._format_courses_for_data(results)
+                        courses = self.formatter._format_courses_for_data(results)
 
                         context_data = {"courses": courses}
                         natural_response = self.generate_response(
@@ -502,7 +521,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             if course_service:
                 results = course_service.search_courses(query, 10)
                 if results and results["ids"][0]:
-                    courses = self._format_courses_for_data(results)
+                    courses = self.formatter._format_courses_for_data(results)
 
                     #  filtered_courses = self.filter_relevant_content(courses, max_items=5, intent=query_intent)
 
@@ -514,46 +533,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
                     return context_data, natural_response, query_intent
 
                 return None, "No results found for your query.", "no_results"
-
-    def _format_courses_for_data(self, courses_or_results):
-        """Format course data consistently for response"""
-        formatted_courses = []
-
-        if isinstance(courses_or_results, dict) and "ids" in courses_or_results:
-            results = courses_or_results
-            for i in range(len(results["ids"][0])):
-                formatted_courses.append(
-                    {
-                        "course_code": results["ids"][0][i],
-                        "title": results["metadatas"][0][i].get("title", "Unknown"),
-                        "year": results["metadatas"][0][i].get("year", 0),
-                        "semester": results["metadatas"][0][i].get("semester", 0),
-                        "ects": results["metadatas"][0][i].get("ects"),
-                        "document": results["documents"][0][i],
-                        "distance": (
-                            results["distances"][0][i]
-                            if "distances" in results
-                            else 1.0
-                        ),
-                    }
-                )
-
-        elif isinstance(courses_or_results, list):
-            for course in courses_or_results:
-                formatted_courses.append(
-                    {
-                        "course_code": course["course_code"],
-                        "title": course["metadata"].get("title", "Unknown"),
-                        "year": course["metadata"].get("year", 0),
-                        "semester": course["metadata"].get("semester", 0),
-                        "ects": course["metadata"].get("ects"),
-                        "document": course["document"],
-                        "distance": 1.0,
-                    }
-                )
-
-        return formatted_courses
-
+    
     def generate_response(self, intent, context_data, query=None):
         """
         Generate a natural language response using the LLM based on intent and data
@@ -568,7 +548,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
         """
         if not self.llm:
             logger.warning("LLM not initialized, falling back to template responses")
-            return self._generate_fallback_response(intent, context_data)
+            return self.formatter._generate_fallback_response(intent, context_data)
 
         if intent in NEWS_INTENT_MAPPING and "news_items" in context_data:
             context_data["news_items"] = self.filter_relevant_content(
@@ -588,7 +568,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             else:
                 prompt = PROMPT_MAP[intent]
 
-            formatted_prompt = self._format_prompt_with_context(
+            formatted_prompt = self.formatter._format_prompt_with_context(
                 prompt, intent, context_data, query
             )
 
@@ -608,100 +588,10 @@ return ONLY the classification as a list of three elements: [year, semester, yea
 
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
-            return self._generate_fallback_response(intent, context_data)
+            return self.formatter._generate_fallback_response(intent, context_data)
 
-    def _format_prompt_with_context(self, prompt, intent, context_data, query=None):
-        """Format prompt with context data and clearly identify the user's query"""
-        try:
-            format_data = {}
-
-            original_query_section = ""
-            if query:
-                original_query_section = f'\n\nOriginal user query: "{query}"'
-                format_data["query"] = query
-
-            if intent == IntentType.PROFESSOR_COURSES:
-                format_data["professor_name"] = context_data.get(
-                    "professor_name", "Unknown"
-                )
-                format_data["courses"] = self._format_courses_for_prompt(
-                    context_data.get("courses", [])
-                )
-
-            elif intent in NEWS_INTENT_MAPPING:
-                format_data["news_items"] = self._format_news_for_prompt(
-                    context_data.get("news_items", [])
-                )
-
-            elif (
-                intent == IntentType.COURSE_SEARCH
-                or intent == IntentType.COURSE_FILTERING
-            ):
-                format_data["courses"] = self._format_courses_for_prompt(
-                    context_data.get("courses", [])
-                )
-
-            formatted_prompt = prompt.format(**format_data)
-
-            formatted_prompt += original_query_section
-
-            return formatted_prompt
-
-        except Exception as e:
-            logger.error(f"Error formatting prompt: {str(e)}")
-            return prompt
-
-    def _format_courses_for_prompt(self, courses):
-        """Format course data for inclusion in prompts"""
-        if not courses:
-            return "No courses found."
-
-        formatted_text = ""
-        for i, course in enumerate(courses, 1):
-            formatted_text += f"Course {i}:\n"
-            formatted_text += f"  - Code: {course.get('course_code', 'Unknown')}\n"
-            formatted_text += f"  - Title: {course.get('title', 'Unknown')}\n"
-            formatted_text += f"  - Year: {course.get('year', 'Unknown')}\n"
-            formatted_text += f"  - Semester: {course.get('semester', 'Unknown')}\n"
-            if course.get("ects"):
-                formatted_text += f"  - ECTS: {course.get('ects')}\n"
-            if course.get("document"):
-                doc_preview = course.get("document", "")[:500]
-                if len(course.get("document", "")) > 500:
-                    doc_preview += "..."
-                formatted_text += f"  - Description: {doc_preview}\n"
-            formatted_text += "\n"
-
-        return formatted_text
-
-    def _format_news_for_prompt(self, news_items):
-        """Format news data for inclusion in prompts"""
-        if not news_items:
-            return "No news items found."
-
-        formatted_text = ""
-        for i, item in enumerate(news_items, 1):
-            formatted_text += f"News Item {i}:\n"
-            formatted_text += (
-                f"  - Title: {item.get('metadata', {}).get('title', 'Untitled')}\n"
-            )
-            if "date_published" in item.get("metadata", {}):
-                formatted_text += f"  - Date: {item['metadata']['date_published']}\n"
-
-            # full content
-            formatted_text += f"  - Content: {item.get('content', '')}\n"
-
-            # λιν
-            if "links" in item.get("metadata", {}):
-                formatted_text += "  - Links:\n"
-                for link in item["metadata"]["links"]:
-                    formatted_text += (
-                        f"    - {link.get('text', '')}: {link.get('url', '')}\n"
-                    )
-            formatted_text += "\n"
-
-        return formatted_text
-
+   
+   
     def apply_reranker(self, query, content_items, max_items=3):
 
         ##todo
@@ -741,74 +631,3 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             return content_items[:max_items]
 
     #! fallback otan dn exei llm
-    def _generate_fallback_response(self, intent, context_data):
-        """Generate a fallback response when LLM is unavailable"""
-        if intent == IntentType.PROFESSOR_COURSES:
-            return self._generate_professor_courses_fallback(context_data)
-        elif intent in NEWS_INTENT_MAPPING:
-            return self._generate_news_fallback(intent, context_data)
-        else:
-            return "Here is the information I found. (Note: Enhanced formatting is currently unavailable.)"
-
-    def _generate_professor_courses_fallback(self, context_data):
-        """Generate a fallback response for professor courses"""
-        professor_name = context_data.get("professor_name", "Unknown")
-        courses = context_data.get("courses", [])
-
-        if not courses:
-            return f"I couldn't find any courses taught by Professor {professor_name}."
-
-        # * Group courses by year and semester
-        courses_by_year_sem = {}
-        for course in courses:
-            key = (course.get("year", 0), course.get("semester", 0))
-            if key not in courses_by_year_sem:
-                courses_by_year_sem[key] = []
-            courses_by_year_sem[key].append(course)
-
-        response = f"Professor {professor_name} teaches {len(courses)} courses:\n\n"
-
-        for (year, semester), year_courses in sorted(courses_by_year_sem.items()):
-            if year > 0 and semester > 0:
-                response += f"Year {year}, Semester {semester}:\n"
-
-            for course in year_courses:
-                response += f"• {course['title']} ({course['course_code']})"
-                if course.get("ects"):
-                    response += f", {course['ects']} ECTS"
-                response += "\n"
-            response += "\n"
-
-        return response
-
-    def _generate_news_fallback(self, intent, context_data):
-        """Generate a fallback response for news items"""
-        news_items = context_data.get("news_items", [])
-
-        if not news_items:
-            return "I couldn't find any relevant news announcements."
-
-        intent_titles = {
-            IntentType.NEWS_INTERNSHIP: "internship announcements",
-            IntentType.NEWS_THESIS: "thesis opportunities",
-            IntentType.NEWS_STUDENT: "student-related announcements",
-            IntentType.NEWS_DISTINCTIONS: "distinction and award announcements",
-            IntentType.NEWS_EVENTS: "upcoming events",
-            IntentType.NEWS_VACANCIES: "vacancy announcements",
-            IntentType.NEWS_GENERAL: "news announcements",
-        }
-
-        title = intent_titles.get(intent, "announcements")
-        response = f"Here are the latest {title}:\n\n"
-
-        for i, item in enumerate(news_items[:5], 1):
-            response += f"{i}. {item['metadata'].get('title', 'Announcement')}"
-            if "date_published" in item["metadata"]:
-                response += f" ({item['metadata']['date_published']})"
-            response += "\n"
-            content = item["content"]
-            if len(content) > 150:
-                content = content[:150] + "..."
-            response += f"{content}\n\n"
-
-        return response

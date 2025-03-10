@@ -167,3 +167,41 @@ class NameService:
             logger.error(f"Error in embedding similarity search: {str(e)}")
 
         return None
+    
+    def find_canonical_name_with_confidence(self, query_name):
+        """Find canonical name and return confidence level
+        prob will replace find_canonical_name, this works in the context of multi-turn chat
+        if we're unsure of a match, we can ask the user to be more specific!"""
+        if not query_name:
+            return None, 0.0
+
+        query_name = query_name.strip()
+        if query_name.lower() in self.name_cache:
+            return self.name_cache[query_name.lower()], 1.0
+        
+        logger.info(f"{query_name} not found in cache, using embedding similarity...")
+        
+        if not self.embedding_cache or not self.nlp_service:
+            return None, 0.0 
+
+        try:
+            query_embedding = self.nlp_service.get_embeddings([query_name])[0]
+            
+            best_match = None
+            best_similarity = -1
+            
+            for canonical_name, embedding in self.embedding_cache.items():
+                similarity = self.nlp_service.calculate_similarity(query_embedding, embedding)
+                logger.info(f"Comparing '{query_name}' with '{canonical_name}': similarity {similarity:.4f}")
+                
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_match = canonical_name
+            
+            if best_similarity > 0:
+                return best_match, best_similarity
+                    
+        except Exception as e:
+            logger.error(f"Error in embedding similarity search: {str(e)}")
+
+        return None, 0.0
