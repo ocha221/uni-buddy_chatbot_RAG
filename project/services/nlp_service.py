@@ -590,8 +590,6 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             logger.error(f"Error generating response: {str(e)}")
             return self.formatter._generate_fallback_response(intent, context_data)
 
-   
-   
     def apply_reranker(self, query, content_items, max_items=3):
 
         ##todo

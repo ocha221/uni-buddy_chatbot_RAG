@@ -451,3 +451,116 @@ button:active {
         font-size: 1.8rem;
     }
 }
+
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-history {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+}
+
+.chat-input {
+    display: flex;
+    padding: 12px;
+    background-color: white;
+    border-top: 1px solid #e0e0e0;
+}
+
+.chat-input input {
+    flex: 1;
+    margin-right: 10px;
+}
+
+.user-message, .assistant-message, .system-message {
+    max-width: 80%;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 18px;
+    line-height: 1.4;
+}
+
+.user-message {
+    align-self: flex-end;
+    margin-left: auto;
+    background-color: #007bff;
+    color: white;
+}
+
+.assistant-message {
+    align-self: flex-start;
+    background-color: #e9ecef;
+}
+
+.system-message {
+    align-self: center;
+    text-align: center;
+    background-color: #f8f9fa;
+    border: 1px solid #e2e2e2;
+    font-style: italic;
+    margin: 10px auto;
+}
+
+.structured-data {
+    margin: 10px 0;
+    max-width: 90%;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.structured-data h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #555;
+    font-size: 0.9em;
+    text-transform: uppercase;
+}
+
+.structured-item {
+    padding: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.structured-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.item-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.item-details, .item-date {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.reset-button {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    color: #666;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.reset-button:hover {
+    background-color: #e9ecef;
+}

@@ -23,6 +23,12 @@ from db.collections import Collections
 
 from services.refresh_service import RefreshService
 
+
+#todo add queue for admin requests 
+#todo for example like
+#todo someone initiates a refresh while another one is running, or like trying to consolidate while course refresh is running
+#todo & add a retry on failure but log like the specific course code/professor that failed to insert
+#todo to save on tokens :)
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "api_service.log")
@@ -505,7 +511,7 @@ async def unified_search(request: QueryRequest):
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """Chat endpoint that maintains conversation context"""
-    return None #TODO 
+    
     return chat_service.process_message(
         request.session_id,
         request.message,

@@ -143,7 +143,7 @@ class ChatService:
             "data": response_data
         }
     
-    def _handle_clarification(self, session, message, **services):
+    def _handle_clarification(self, session, message, **services): #todo fixy
         """Handle response to a clarification request"""
         clarification_type = session.get_context("clarification_type")
         original_query = session.get_context("original_query")

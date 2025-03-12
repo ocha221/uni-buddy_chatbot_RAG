@@ -59,35 +59,176 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// API Functions
-async function naturalSearch() {
-    const query = document.getElementById('natural-query').value.trim();
-    const resultsContainer = document.getElementById('natural-results');
+// Global session ID variable
+let chatSessionId = null;
+
+// Replace the existing natural search with these functions
+document.addEventListener('DOMContentLoaded', function() {
+    // Add this to your existing event listeners
+    const chatSendButton = document.getElementById('chat-send-button');
+    const chatInput = document.getElementById('chat-message-input');
     
-    if (!query) {
-        resultsContainer.innerHTML = '<div class="error">Please enter a question or query</div>';
+    chatSendButton.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') sendChatMessage();
+    });
+    
+    // Optional: Add reset conversation button
+    const resetChatButton = document.getElementById('reset-chat-button');
+    if (resetChatButton) {
+        resetChatButton.addEventListener('click', resetChatConversation);
+    }
+});
+
+async function sendChatMessage() {
+    const messageInput = document.getElementById('chat-message-input');
+    const message = messageInput.value.trim();
+    const chatHistory = document.getElementById('chat-history');
+    
+    if (!message) {
         return;
     }
     
-    resultsContainer.innerHTML = '<div class="loading">Processing your query</div>';
+    // Add user message to chat history
+    appendMessage('user', message);
+    
+    // Clear input
+    messageInput.value = '';
+    
+    // Add temporary thinking message
+    const thinkingId = appendMessage('system', 'Thinking...');
     
     try {
-        const response = await fetch('/search/unified', {
+        const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query: query })
+            body: JSON.stringify({
+                message: message,
+                session_id: chatSessionId
+            })
         });
         
         const data = await response.json();
         
-        // Use generic display function instead of type-specific ones
-        displayUnifiedResults(data, resultsContainer);
+        // Remove thinking message
+        document.getElementById(thinkingId).remove();
+        
+        // Store session ID for future messages
+        if (data.session_id) {
+            chatSessionId = data.session_id;
+        }
+        
+        // Add assistant response to chat history
+        appendMessage('assistant', data.message);
+        
+        // If we have structured data, display it in a rich format
+        if (data.data) {
+            displayStructuredData(data);
+        }
+        
     } catch (error) {
-        resultsContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+        // Remove thinking message
+        document.getElementById(thinkingId).remove();
+        
+        // Show error message
+        appendMessage('system', `Error: ${error.message}`);
     }
 }
+
+function appendMessage(role, content) {
+    const chatHistory = document.getElementById('chat-history');
+    const messageId = 'msg-' + Date.now();
+    const messageDiv = document.createElement('div');
+    
+    messageDiv.id = messageId;
+    messageDiv.className = role + '-message';
+    
+    // For assistant messages, convert markdown-like formatting
+    if (role === 'assistant') {
+        // Simple formatting: bold, italic, code
+        content = content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            // Handle line breaks
+            .replace(/\n/g, '<br>');
+        
+        messageDiv.innerHTML = content;
+    } else {
+        messageDiv.textContent = content;
+    }
+    
+    chatHistory.appendChild(messageDiv);
+    
+    // Scroll to bottom
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return messageId;
+}
+
+function displayStructuredData(data) {
+    const chatHistory = document.getElementById('chat-history');
+    const structuredDiv = document.createElement('div');
+    structuredDiv.className = 'structured-data';
+    
+    let html = '<div class="structured-data-content">';
+    
+    // Process different data structures based on what's available
+    if (data.data) {
+        // Handle professor courses
+        if (data.data.courses && Array.isArray(data.data.courses)) {
+            html += '<h4>Courses:</h4>';
+            data.data.courses.forEach(course => {
+                html += `
+                    <div class="structured-item">
+                        <div class="item-title">${course.title || 'Unknown'} (${course.course_code || 'No code'})</div>
+                        <div class="item-details">
+                            ${course.year ? `Year: ${course.year}` : ''}
+                            ${course.semester ? `, Semester: ${course.semester}` : ''}
+                            ${course.ects ? `, ECTS: ${course.ects}` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        // Handle news items
+        else if (data.data.news_items && Array.isArray(data.data.news_items)) {
+            html += '<h4>Relevant News:</h4>';
+            data.data.news_items.forEach(item => {
+                html += `
+                    <div class="structured-item">
+                        <div class="item-title">${item.metadata?.title || "News Item"}</div>
+                        <div class="item-date">${item.metadata?.date_published || ""}</div>
+                    </div>
+                `;
+            });
+        }
+    }
+    
+    html += '</div>';
+    
+    // Only append if we have content to show
+    if (html.length > 60) { // More than just the wrapper divs
+        structuredDiv.innerHTML = html;
+        chatHistory.appendChild(structuredDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+}
+
+function resetChatConversation() {
+    // Reset session ID
+    chatSessionId = null;
+    
+    // Clear chat history
+    const chatHistory = document.getElementById('chat-history');
+    chatHistory.innerHTML = '';
+    
+    // Add welcome message
+    appendMessage('system', 'Hello! I\'m your university assistant. Ask me anything about courses, professors, or other university information.');
+}
+
 
 function displayUnifiedResults(data, container) {
     // Handle error states

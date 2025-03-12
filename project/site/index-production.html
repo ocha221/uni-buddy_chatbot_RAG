@@ -24,21 +24,19 @@
     <main>
         <!-- Natural Language Search Section -->
         <section id="natural-search" class="tab-content active">
-            <h2>Ask About Anything</h2>
+            <h2>University Assistant</h2>
             
-            <div class="chat-input">
-                <input type="text" id="natural-query" placeholder="Ask about courses, professors, or anything else...">
-                <button id="ask-button">Ask</button>
-            </div>
-            
-            <div id="natural-results" class="results-container">
-                <div class="info">
-                    Try asking questions like:
-                    <ul style="margin-top: 10px; margin-left: 20px;">
-                        <li>"What courses does Professor Johnson teach?"</li>
-                        <li>"Show me third-year courses in the second semester"</li>
-                        <li>"Which courses are about machine learning?"</li>
-                    </ul>
+            <div class="chat-container">
+                <button id="reset-chat-button" class="reset-button">New Conversation</button>
+                <div id="chat-history" class="chat-history">
+                    <div class="system-message">
+                        Hello! I'm your university assistant. Ask me anything about courses, professors, or other university information.
+                    </div>
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="chat-message-input" placeholder="Type your question here...">
+                    <button id="chat-send-button">Send</button>
                 </div>
             </div>
         </section>
