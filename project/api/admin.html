@@ -21,7 +21,11 @@
         <button onclick="refreshData('courses')">Refresh Courses</button>
         <button onclick="refreshData('news')">Refresh News</button>
         <button onclick="refreshData('professors')">Rebuild Professors</button>
-        <button onclick="refreshData('all')">Refresh All</button>
+        <div style="margin-top: 10px;">
+            <label for="maxRetries">Max Retries (0-10):</label>
+            <input type="number" id="maxRetries" value="3" min="0" max="10" style="width: 60px;">
+            <button onclick="refreshData('all')">Refresh All</button>
+        </div>
         <div id="manualResult" class="result"></div>
     </div>
     
@@ -50,17 +54,23 @@
     
     <script>
         async function refreshData(type) {
-            document.getElementById('manualResult').textContent = `Starting ${type} refresh...`;
-            try {
-                const response = await fetch(`/api/refresh/${type}`, {
-                    method: 'POST',
-                });
-                const data = await response.json();
-                document.getElementById('manualResult').textContent = data.message;
-            } catch (error) {
-                document.getElementById('manualResult').textContent = `Error: ${error.message}`;
-            }
+    document.getElementById('manualResult').textContent = `Starting ${type} refresh...`;
+    try {
+        let url = `/api/refresh/${type}`;
+        if (type === 'all') {
+            const maxRetries = document.getElementById('maxRetries').value;
+            url += `?max_retries=${maxRetries}`;
         }
+        
+        const response = await fetch(url, {
+            method: 'POST',
+        });
+        const data = await response.json();
+        document.getElementById('manualResult').textContent = data.message;
+    } catch (error) {
+        document.getElementById('manualResult').textContent = `Error: ${error.message}`;
+    }
+}
         
         async function setSchedule() {
             const hours = document.getElementById('hours').value;

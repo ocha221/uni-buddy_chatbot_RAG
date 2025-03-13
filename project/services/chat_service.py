@@ -151,6 +151,9 @@ class ChatService:
         #? Reset clarification state
         session.update_context("awaiting_clarification", False)
         session.update_context("clarification_type", None)
+        logger.debug(f"Clarification type: {clarification_type}")
+        logger.debug(f"Professor service available: {bool(services.get('professor_service'))}")
+        logger.debug(f"Name service available: {bool(services.get('name_service'))}")
         
         message_lower = message.lower()
         affirmative = any(word in message_lower for word in ["yes", "yep", "yeah", "correct", "right", "that's it"])

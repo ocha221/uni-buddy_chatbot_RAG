@@ -286,7 +286,7 @@ async def refresh_professors(background_tasks: BackgroundTasks):
 
 
 @app.post("/api/refresh/all", response_model=RefreshResponse)
-async def refresh_all(background_tasks: BackgroundTasks):
+async def refresh_all(background_tasks: BackgroundTasks, max_retries: int = Query(3, ge=0, le=10)):
     """Refresh all collections with latest data"""
 
     def do_refresh():
@@ -297,7 +297,7 @@ async def refresh_all(background_tasks: BackgroundTasks):
                 professor_service=professor_service,
                 name_service=name_service,
             )
-            results = global_refresh_service.refresh_all(reset=True)
+            results = global_refresh_service.refresh_all(reset=True, max_retries=max_retries)
             logger.info(f"Background full refresh completed: {results}")
         except Exception as e:
             logger.error(f"Background full refresh error: {str(e)}")
@@ -305,7 +305,7 @@ async def refresh_all(background_tasks: BackgroundTasks):
     background_tasks.add_task(do_refresh)
     return RefreshResponse(
         success=True,
-        message="Full database refresh started in background",
+        message=f"Full database refresh started in background with {max_retries} max retries",
     )
 
 

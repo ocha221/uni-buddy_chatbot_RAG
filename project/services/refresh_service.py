@@ -2,6 +2,8 @@ import os
 import logging
 import re
 from datetime import datetime
+import time
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,57 @@ class RefreshService:
             
         return latest_dir
     
-    def refresh_courses(self, base_path="course_data", skip_professors=False, reset=True):
+       
+
+    def retry_operation(self, operation_func, items, max_retries=3, delay=5):
+        """
+        Retry failed imports/etc
+        """
+
+        successful_items = []
+        failed_items = []
+        
+        for item in items:
+            try:
+                if operation_func(item):
+                    successful_items.append(item)
+                else:
+                    failed_items.append(item)
+            except Exception as e:
+                logger.error(f"Error processing item: {str(e)}")
+                failed_items.append(item)
+        
+       #* retry whatev failed
+        retry_count = 0
+        current_delay = delay
+        
+        while failed_items and retry_count < max_retries:
+            retry_count += 1
+            logger.info(f"Retry attempt {retry_count}/{max_retries} for {len(failed_items)} failed items")
+            time.sleep(current_delay)
+            current_delay *= 2  #*exponential
+            
+            #*another retry
+            still_failed = []      
+            for item in failed_items:
+                try:
+                    logger.info(f"Retrying item: {getattr(item, 'course_code', getattr(item, 'id', str(item)))}")
+                    if operation_func(item):
+                        successful_items.append(item)
+                    else:
+                        still_failed.append(item)
+                except Exception as e:
+                    logger.error(f"Error during retry: {str(e)}")
+                    still_failed.append(item)
+            
+            failed_items = still_failed
+        
+        if failed_items:
+            logger.warning(f"After {max_retries} retries, {len(failed_items)} items still failed")
+            
+        return successful_items, failed_items
+    
+    def refresh_courses(self, base_path="course_data", skip_professors=False, reset=True, max_retries=3):
         """Refresh courses collection with latest data"""
         latest_dir = self.find_latest_data_directory(base_path)
         if not latest_dir:
@@ -64,9 +116,46 @@ class RefreshService:
             )
         
         logger.info(f"Refreshing courses from {latest_dir}")
-        return self.course_service.batch_import_courses(latest_dir, skip_professors)
+        course_files = self.course_service.find_course_files(latest_dir)
+        
+        if not course_files:
+            logger.warning(f"No course files found in {latest_dir}")
+            return 0
+            
+        logger.info(f"Found {len(course_files)} course files to import")
+        
+        courses = []
+        for file_path in course_files:
+            course = self.course_service.load_course(file_path)
+            if course:
+                courses.append(course)
+        
+        def add_course_operation(course):
+            if skip_professors:
+                document = course.to_document()
+                metadata = course.to_metadata()
+                
+                self.course_service.course_collection.add(
+                    documents=[document],
+                    ids=[course.course_code],
+                    metadatas=[metadata]
+                )
+                
+                time.sleep(self.course_service.EMBEDDING_DELAY)
+                
+                logger.info(f"Added course {course.course_code} to database (skipped professor data)")
+                return True
+            else:
+                return self.course_service.add_course(course)
+        successful, failed = self.retry_operation(add_course_operation, courses, max_retries=max_retries)
+        
+        if failed:
+            logger.warning(f"Failed to import {len(failed)} courses: {[getattr(c, 'course_code', 'Unknown') for c in failed]}")
+        
+        logger.info(f"Successfully imported {len(successful)} out of {len(courses)} courses")
+        return len(successful)
     
-    def refresh_news(self, base_path="news_data", reset=True):
+    def refresh_news(self, base_path="news_data", reset=True, max_retries=3):
         """Refresh news collection with latest data"""
         latest_dir = self.find_latest_data_directory(base_path)
         if not latest_dir:
@@ -83,27 +172,49 @@ class RefreshService:
             self.news_service.news_collection = self.news_service.collections.get_news_collection()
         
         logger.info(f"Refreshing news from {latest_dir}")
-        return self.news_service.batch_import_news(latest_dir)
-    
-    def refresh_professors(self, consolidate=True):
-        """Rebuild professor data from courses"""
-        if not self.professor_service:
-            logger.error("Professor service not available")
+        
+        
+        news_files = []
+        for root, _, files in os.walk(latest_dir):
+            for file in files:
+                if file.endswith(".json"):
+                    file_path = os.path.join(root, file)
+                    news_files.append(file_path)
+        
+        if not news_files:
+            logger.warning(f"No news files found in {latest_dir}")
             return 0
         
-        logger.info("Rebuilding professor data")
-        count = self.professor_service.rebuild_professor_data()
+        logger.info(f"Found {len(news_files)} news files to import")
         
-        if consolidate and count > 0 and self.name_service:
-            logger.info("Consolidating professor names")
-            self.professor_service.consolidate_professor_names(interactive=False)
+        news_items = []
+        for file_path in news_files:
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                data["news_types"] = self.news_service.determine_news_types(data)
+                news = self.news_service.News.from_json(data)
+                news_items.append(news)
+            except Exception as e:
+                logger.error(f"Error processing {file_path}: {str(e)}")
         
-        return count
+        def add_news_operation(news_item):
+            return self.news_service.add_news(news_item)
+        
+        successful, failed = self.retry_operation(add_news_operation, news_items, max_retries=max_retries)
+        
+        if failed:
+            logger.warning(f"Failed to import {len(failed)} news items: {[getattr(n, 'id', 'Unknown') for n in failed]}")
+        
+        logger.info(f"Successfully imported {len(successful)} out of {len(news_items)} news items")
+        return len(successful)
     
-    def refresh_all(self, course_path="course_data", news_path="news_data", reset=True):
+   
+    def refresh_all(self, course_path="course_data", news_path="news_data", reset=True, max_retries=3):
         """Refresh all collections with latest data"""
-        course_count = self.refresh_courses(course_path, skip_professors=True, reset=reset)
-        news_count = self.refresh_news(news_path, reset=reset)
+        course_count = self.refresh_courses(course_path, skip_professors=True, reset=reset, max_retries=max_retries)
+        news_count = self.refresh_news(news_path, reset=reset, max_retries=max_retries)
         prof_count = self.refresh_professors(consolidate=True)
         
         return {
