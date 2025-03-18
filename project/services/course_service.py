@@ -31,7 +31,7 @@ class CourseService:
             logger.error(f"Error loading course from {file_path}: {str(e)}")
             return None
     
-    def add_course(self, course):
+    def add_course(self, course, skip_professors=False):
         """Add a course to the database"""
         try:
             document = course.to_document()
@@ -48,7 +48,7 @@ class CourseService:
             logger.info(f"Added course {course.course_code} to database")
             
             # Process instructors if professor service is available
-            if self.professor_service and course.instructors:
+            if self.professor_service and course.instructors and not skip_professors:
                 instructors = self._process_instructors(course.instructors)
                 for instructor in instructors:
                     self.professor_service.add_professor(instructor, course.course_code, course.title)

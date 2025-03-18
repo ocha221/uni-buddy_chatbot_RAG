@@ -1,6 +1,7 @@
 chroma_db/
 course_data/
 news_data/
+scraped_data/
 env/
 __pycache__/
 *.pyc
@@ -9,3 +10,4 @@ __pycache__/
 settings.py
 logs/
 test_path.py
+old_code.py

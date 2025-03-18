@@ -143,17 +143,14 @@ class ChatService:
             "data": response_data
         }
     
-    def _handle_clarification(self, session, message, **services): #todo fixy
+    def _handle_clarification(self, session, message, **services):
         """Handle response to a clarification request"""
         clarification_type = session.get_context("clarification_type")
         original_query = session.get_context("original_query")
         
-        #? Reset clarification state
+        # Reset clarification state
         session.update_context("awaiting_clarification", False)
         session.update_context("clarification_type", None)
-        logger.debug(f"Clarification type: {clarification_type}")
-        logger.debug(f"Professor service available: {bool(services.get('professor_service'))}")
-        logger.debug(f"Name service available: {bool(services.get('name_service'))}")
         
         message_lower = message.lower()
         affirmative = any(word in message_lower for word in ["yes", "yep", "yeah", "correct", "right", "that's it"])
@@ -162,17 +159,15 @@ class ChatService:
             candidate_match = session.get_context("candidate_match")
             
             if affirmative:
-                #? User confirmed the professor name match
+                #User confirmed the professor name match
                 professor_service = services.get("professor_service")
                 name_service = services.get("name_service")
                 
-                if professor_service and name_service:
-                    #? Add this as a confirmed variation
+                if professor_service and name_service and candidate_match:
                     original_name = self.nlp_service.extract_professor_name(original_query)
                     if original_name and original_name != candidate_match:
                         name_service.add_name_variation(candidate_match, original_name)
                     
-                    #? Now process with the confirmed name
                     courses = professor_service.get_courses_by_professor(candidate_match)
                     
                     if courses:
@@ -196,7 +191,7 @@ class ChatService:
                         
                         session.update_context("active_courses", course_list)
                         
-                        #? Generate response using NLPService
+                       
                         response_message = self.nlp_service.generate_response(
                             IntentType.PROFESSOR_COURSES, 
                             context_data, 
@@ -206,14 +201,17 @@ class ChatService:
                         return context_data, response_message, IntentType.PROFESSOR_COURSES
                     
                     return None, f"I couldn't find any courses for Professor {candidate_match}.", "no_results"
+                else:
+                    
+                    return None, "Sorry, I couldn't process that request properly.", "error"
             else:
-                #? User rejected the match, ask for clarification
+                
                 return None, "Could you please provide the full name of the professor you're looking for?", "clarification_request"
         
-        #? Default fallback if clarification handling fails
+        
         query_intent = self.nlp_service.analyze_query_intent(message)
         return self.nlp_service.process_unified_query(message, query_intent, **services)
-    
+   
     def _is_followup_question(self, message, session):
         """Determine if the message is a follow-up question based on session context"""
         message_lower = message.lower()

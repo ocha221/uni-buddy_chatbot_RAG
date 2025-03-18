@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
 import uvicorn
 import logging
@@ -20,7 +20,7 @@ from services.news_service import NewsService
 from services.chat_service import ChatService
 from models.intent_mappings import IntentType, NEWS_INTENT_MAPPING
 from db.collections import Collections
-
+from services.tool_use_search import ToolBasedChatService
 from services.refresh_service import RefreshService
 
 
@@ -102,7 +102,8 @@ name_service = NameService(collections, nlp_service)
 course_service = CourseService(collections)
 professor_service = ProfessorService(collections, name_service)
 news_service = NewsService(collections)
-chat_service = ChatService(nlp_service)
+chat_service = ToolBasedChatService(nlp_service=nlp_service, name_service=name_service, professor_service=professor_service, course_service=course_service, news_service=news_service)
+
 
 # * services
 professor_service.set_course_service(course_service)
@@ -178,7 +179,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+async def shutdown_event():  
     logger.info("API server shutting down")
     stop_scheduler()
 
@@ -210,7 +211,7 @@ class QueryRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: Optional[str] = None
+    session_context: Optional[Dict] = None
 
 
 @app.post("/api/refresh/courses", response_model=RefreshResponse)
@@ -511,14 +512,8 @@ async def unified_search(request: QueryRequest):
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """Chat endpoint that maintains conversation context"""
-    
     return chat_service.process_message(
-        request.session_id,
-        request.message,
-        news_service=news_service,
-        professor_service=professor_service,
-        course_service=course_service,
-        name_service=name_service
+        message=request.message
     )
 
 @app.get("/api/printnews")
