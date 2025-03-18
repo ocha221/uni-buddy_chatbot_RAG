@@ -61,18 +61,55 @@ class NewsScraper:
 
     def classify_news_by_keywords(self, content):
         keywords = {
-            "internship-related": ["πρακτική", "άσκηση", "internship", "πρακτικη", "ασκηση"],
-            "student-related": ["φοιτητ", "σπουδαστ", "εξάμην", "φοιτητές", "μαθητ", "εξεταστική", "διαλέξ"],
-            "distinctions-awards": ["διάκρισ", "βραβε", "award", "βραβείο", "αριστεί", "διακρίθηκ"],
-            "events-activities": ["εκδήλωση", "σεμινάριο", "workshop", "διάλεξη", "ημερίδα", "συνέδριο", "παρουσίαση"],
-            "vacancies": ["θέση", "προκήρυξη", "vacancy", "διδασκόντων", "πρόσληψη", "αίτηση", "εργασία"]
+            "internship-related": [
+                "πρακτική",
+                "άσκηση",
+                "internship",
+                "πρακτικη",
+                "ασκηση",
+            ],
+            "student-related": [
+                "φοιτητ",
+                "σπουδαστ",
+                "εξάμην",
+                "φοιτητές",
+                "μαθητ",
+                "εξεταστική",
+                "διαλέξ",
+            ],
+            "distinctions-awards": [
+                "διάκρισ",
+                "βραβε",
+                "award",
+                "βραβείο",
+                "αριστεί",
+                "διακρίθηκ",
+            ],
+            "events-activities": [
+                "εκδήλωση",
+                "σεμινάριο",
+                "workshop",
+                "διάλεξη",
+                "ημερίδα",
+                "συνέδριο",
+                "παρουσίαση",
+            ],
+            "vacancies": [
+                "θέση",
+                "προκήρυξη",
+                "vacancy",
+                "διδασκόντων",
+                "πρόσληψη",
+                "αίτηση",
+                "εργασία",
+            ],
         }
-        
+
         detected_types = []
         for type_name, words in keywords.items():
             if any(word in content for word in words):
                 detected_types.append(type_name)
-        
+
         return detected_types
 
     def get_news(self):
@@ -124,14 +161,16 @@ class NewsScraper:
                 if link_text in type_mapping:
                     news_types.append(type_mapping[link_text])
 
-        if not news_types or len(news_types) < 2:  
-            content_for_classification = f"{news_data['title']} {news_data['content']}".lower()
+        if not news_types or len(news_types) < 2:
+            content_for_classification = (
+                f"{news_data['title']} {news_data['content']}".lower()
+            )
             keyword_types = self.classify_news_by_keywords(content_for_classification)
-            
+
             for kw_type in keyword_types:
                 if kw_type not in news_types:
                     news_types.append(kw_type)
-                    
+
         news_data["news_types"] = news_types or ["general"]
 
         if news_data["date_published"]:
@@ -155,9 +194,7 @@ class NewsScraper:
             class_="et_pb_module et_pb_post_content et_pb_post_content_0_tb_body"
         )
         if content_elem:
-            news_data["content"] = content_elem.get_text(
-                separator="\n", strip=True
-            )
+            news_data["content"] = content_elem.get_text(separator="\n", strip=True)
 
             for link in content_elem.find_all("a", href=True):
                 href = link["href"]
@@ -170,7 +207,7 @@ class NewsScraper:
         return news_data
 
     def scrape_news(self):
-        """scrape everything""" #TODO multithreaded
+        """scrape everything"""  # TODO multithreaded
         links = self.get_news()
         print(f"Found {len(links)} announcements")
 

@@ -743,8 +743,8 @@ class EnhancedScraper:
 if __name__ == "__main__":
     scraper = EnhancedScraper(
         base_url="https://ds.uth.gr/",
-        max_threads=10,
+        max_threads=8,
         max_depth=5,
-        delay_range=(0.3, 1.0),
+        delay_range=(0.5, 1.0),
     )
     scraper.scrape()

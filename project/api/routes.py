@@ -24,11 +24,11 @@ from services.tool_use_search import ToolBasedChatService
 from services.refresh_service import RefreshService
 
 
-#todo add queue for admin requests 
-#todo for example like
-#todo someone initiates a refresh while another one is running, or like trying to consolidate while course refresh is running
-#todo & add a retry on failure but log like the specific course code/professor that failed to insert
-#todo to save on tokens :)
+# todo add queue for admin requests
+# todo for example like
+# todo someone initiates a refresh while another one is running, or like trying to consolidate while course refresh is running
+# todo & add a retry on failure but log like the specific course code/professor that failed to insert
+# todo to save on tokens :)
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "api_service.log")
@@ -102,7 +102,13 @@ name_service = NameService(collections, nlp_service)
 course_service = CourseService(collections)
 professor_service = ProfessorService(collections, name_service)
 news_service = NewsService(collections)
-chat_service = ToolBasedChatService(nlp_service=nlp_service, name_service=name_service, professor_service=professor_service, course_service=course_service, news_service=news_service)
+chat_service = ToolBasedChatService(
+    nlp_service=nlp_service,
+    name_service=name_service,
+    professor_service=professor_service,
+    course_service=course_service,
+    news_service=news_service,
+)
 
 
 # * services
@@ -179,7 +185,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():  
+async def shutdown_event():
     logger.info("API server shutting down")
     stop_scheduler()
 
@@ -208,6 +214,7 @@ class ProfessorResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -287,7 +294,9 @@ async def refresh_professors(background_tasks: BackgroundTasks):
 
 
 @app.post("/api/refresh/all", response_model=RefreshResponse)
-async def refresh_all(background_tasks: BackgroundTasks, max_retries: int = Query(3, ge=0, le=10)):
+async def refresh_all(
+    background_tasks: BackgroundTasks, max_retries: int = Query(3, ge=0, le=10)
+):
     """Refresh all collections with latest data"""
 
     def do_refresh():
@@ -298,7 +307,9 @@ async def refresh_all(background_tasks: BackgroundTasks, max_retries: int = Quer
                 professor_service=professor_service,
                 name_service=name_service,
             )
-            results = global_refresh_service.refresh_all(reset=True, max_retries=max_retries)
+            results = global_refresh_service.refresh_all(
+                reset=True, max_retries=max_retries
+            )
             logger.info(f"Background full refresh completed: {results}")
         except Exception as e:
             logger.error(f"Background full refresh error: {str(e)}")
@@ -509,12 +520,12 @@ async def unified_search(request: QueryRequest):
 
     return {"query_type": query_type, "data": data, "natural_response": message}
 
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """Chat endpoint that maintains conversation context"""
-    return chat_service.process_message(
-        message=request.message
-    )
+    return chat_service.process_message(message=request.message)
+
 
 @app.get("/api/printnews")
 async def print_all_news():

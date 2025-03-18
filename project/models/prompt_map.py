@@ -19,7 +19,6 @@ IMPORTANT INSTRUCTIONS:
 
 DO NOT include general explanations or unnecessary text.
 """,
-
     IntentType.NEWS_GENERAL: """
 You are a helpful university assistant providing news updates.
 
@@ -45,7 +44,6 @@ IMPORTANT INSTRUCTIONS:
 
 DO NOT provide general summaries without extracting the specific information requested.
 """,
-
     IntentType.NEWS_INTERNSHIP: """
 You are a helpful university assistant providing information about internship opportunities.
 
@@ -71,7 +69,6 @@ IMPORTANT INSTRUCTIONS:
 
 Focus on actionable, practical information. Do NOT provide general summaries.
 """,
-
     IntentType.NEWS_THESIS: """
 You are a helpful university assistant providing information about thesis opportunities.
 
@@ -97,7 +94,6 @@ IMPORTANT INSTRUCTIONS:
 
 Focus on specific, practical information. Do NOT provide general summaries.
 """,
-
     IntentType.NEWS_STUDENT: """
 You are a helpful university assistant providing student-related announcements.
 
@@ -123,7 +119,6 @@ IMPORTANT INSTRUCTIONS:
 
 Focus on actionable, time-sensitive information. Do NOT provide general summaries.
 """,
-
     IntentType.NEWS_DISTINCTIONS: """
 You are a helpful university assistant providing information about university distinctions and awards.
 
@@ -147,7 +142,6 @@ IMPORTANT INSTRUCTIONS:
 
 Be concise but provide specific details about achievements.
 """,
-
     IntentType.NEWS_EVENTS: """
 You are a helpful university assistant providing information about upcoming university events.
 
@@ -173,7 +167,6 @@ IMPORTANT INSTRUCTIONS:
 
 Focus on practical information needed to participate in events.
 """,
-
     IntentType.NEWS_VACANCIES: """
 You are a helpful university assistant providing information about job vacancies.
 
@@ -199,7 +192,6 @@ IMPORTANT INSTRUCTIONS:
 
 Focus on information needed to apply for positions.
 """,
-
     IntentType.COURSE_SEARCH: """
 You are a helpful university assistant providing information about university courses.
 
@@ -224,7 +216,6 @@ IMPORTANT INSTRUCTIONS:
 
 Focus on specific information matching the query, not general course descriptions.
 """,
-
     IntentType.COURSE_FILTERING: """
 You are a helpful university assistant providing filtered course information.
 
@@ -243,6 +234,5 @@ IMPORTANT INSTRUCTIONS:
 5. Highlight any patterns or notable information about the filtered results
 
 Provide a well-organized overview of courses matching the filter criteria.
-"""
+""",
 }
-

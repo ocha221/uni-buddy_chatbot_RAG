@@ -3,42 +3,41 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 import json
 
-llm = ChatGroq(
-    model_name="llama-3.3-70b-versatile",
-    temperature=0.7
+llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.7)
+
+parser = JsonOutputParser(
+    pydantic_object={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "price": {"type": "number"},
+            "features": {"type": "array", "items": {"type": "string"}},
+        },
+    }
 )
 
-parser = JsonOutputParser(pydantic_object={
-    "type": "object",
-    "properties": {
-        "name": {"type": "string"},
-        "price": {"type": "number"},
-        "features": {
-            "type": "array",
-            "items": {"type": "string"}
-        }
-    }
-})
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", """Extract product details into JSON with this structure:
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Extract product details into JSON with this structure:
         {{
             "name": "product name here",
             "price": number_here_without_currency_symbol,
             "features": ["feature1", "feature2", "feature3"]
-        }}"""),
-    ("user", "{input}")
-])
+        }}""",
+        ),
+        ("user", "{input}"),
+    ]
+)
 
 
 chain = prompt | llm | parser
 
+
 def parse_product(description: str) -> dict:
     result = chain.invoke({"input": description})
     print(json.dumps(result, indent=2))
-
-        
-
 
 
 if __name__ == "__main__":
@@ -48,8 +47,3 @@ consistency, and a unique pre-infusion system to enhance flavor extraction. Desi
 customizable aesthetics, exceptional thermal stability, and intuitive operation via a lever system. The pricing is approximatelyt $14,499 
 depending on the retailer and customization options."""
     parse_product(description)
-
-
-
-
-

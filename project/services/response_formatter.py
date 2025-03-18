@@ -5,39 +5,40 @@ from langchain.schema import HumanMessage, SystemMessage
 
 logger = logging.getLogger(__name__)
 
+
 class ResponseFormatter:
     """Formats responses for different query types"""
-    
+
     def __init__(self, llm=None):
         self.llm = llm
-    
+
     def format_professor_courses(self, professor_name, courses):
         """Format professor courses response"""
         if not courses:
             return f"I couldn't find any courses taught by Professor {professor_name}."
-        
+
         courses_by_year_sem = {}
         for course in courses:
             key = (course.get("year", 0), course.get("semester", 0))
             if key not in courses_by_year_sem:
                 courses_by_year_sem[key] = []
             courses_by_year_sem[key].append(course)
-        
+
         response = f"Professor {professor_name} teaches {len(courses)} courses:\n\n"
-        
+
         for (year, semester), year_courses in sorted(courses_by_year_sem.items()):
             if year > 0 and semester > 0:
                 response += f"Year {year}, Semester {semester}:\n"
-            
+
             for course in year_courses:
                 response += f"• {course['title']} ({course['course_code']})"
                 if course.get("ects"):
                     response += f", {course['ects']} ECTS"
                 response += "\n"
             response += "\n"
-        
+
         return response
-    
+
     def _format_courses_for_data(self, courses_or_results):
         """Format course data consistently for response"""
         formatted_courses = []
@@ -76,7 +77,7 @@ class ResponseFormatter:
                 )
 
         return formatted_courses
-    
+
     def _format_prompt_with_context(self, prompt, intent, context_data, query=None):
         """Format prompt with context data and clearly identify the user's query"""
         try:
@@ -240,6 +241,3 @@ class ResponseFormatter:
             response += f"{content}\n\n"
 
         return response
-
-   
-    

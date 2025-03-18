@@ -29,7 +29,7 @@ class NLPService:
         except Exception as e:
             logger.error(f"Failed to initialize Groq LLM: {str(e)}")
             self.llm = None
-            
+
     def extract_professor_name(self, query):
         """Extract professor name from query using LLM"""
         if not self.llm:
@@ -331,26 +331,39 @@ return ONLY the classification as a list of three elements: [year, semester, yea
             professor_name = self.extract_professor_name(query)
             if professor_name and professor_service:
                 try:
-                    
-                    if hasattr(name_service, "find_canonical_name_with_confidence"):
-                        canonical_name, confidence = name_service.find_canonical_name_with_confidence(professor_name)
 
-                        confidence = float(confidence) if confidence is not None else 0.0
+                    if hasattr(name_service, "find_canonical_name_with_confidence"):
+                        canonical_name, confidence = (
+                            name_service.find_canonical_name_with_confidence(
+                                professor_name
+                            )
+                        )
+
+                        confidence = (
+                            float(confidence) if confidence is not None else 0.0
+                        )
                         if canonical_name and confidence < SIMILARITY_THRESHOLD:
                             metadata = {
                                 "clarification_needed": True,
                                 "candidate_match": canonical_name,
-                                "confidence": confidence
-                            } #TODO with chat_Service
-                            return metadata, f"I found a professor named '{canonical_name}' that seems similar to '{professor_name}'. Is that who you meant?", "clarification_request"
-                        
+                                "confidence": confidence,
+                            }  # TODO with chat_Service
+                            return (
+                                metadata,
+                                f"I found a professor named '{canonical_name}' that seems similar to '{professor_name}'. Is that who you meant?",
+                                "clarification_request",
+                            )
+
                         if canonical_name:
                             professor_name = canonical_name
                     else:
-                        #* fallback
-                        canonical_name = name_service.find_canonical_name(professor_name) or professor_name
+                        # * fallback
+                        canonical_name = (
+                            name_service.find_canonical_name(professor_name)
+                            or professor_name
+                        )
                         professor_name = canonical_name
-                    
+
                     courses = professor_service.get_courses_by_professor(professor_name)
                     if courses:
                         course_list = self.formatter._format_courses_for_data(courses)
@@ -374,8 +387,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
                 except Exception as e:
                     logger.error(f"Error processing professor query: {str(e)}")
                     return None, "An error occurred processing your query.", "error"
-       
-       
+
         if query_intent == IntentType.NEWS_GENERAL:
             specific_news_intent = self.analyze_news_intent(query)
             logger.info(f"Second-stage classification: {specific_news_intent}")
@@ -533,7 +545,7 @@ return ONLY the classification as a list of three elements: [year, semester, yea
                     return context_data, natural_response, query_intent
 
                 return None, "No results found for your query.", "no_results"
-    
+
     def generate_response(self, intent, context_data, query=None):
         """
         Generate a natural language response using the LLM based on intent and data
